@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from typing import Optional
 
 import typer
 
-from .yax import AgentsmdBuildConfig
+from .yax import AgentsmdBuildConfig, Yax
 
 
 DEFAULT_CONFIG_FILENAME = "yax.yml"
@@ -32,18 +34,36 @@ def build(
         resolve_path=True,
         help="Path to the YAML configuration file.",
         show_default=True,
-    )
+    ),
+    output: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Override the output file path for the generated AGENTS.md.",
+    ),
 ):
     """Load the agentsmd build configuration and report its status."""
 
     build_config = _load_agentsmd_config(config)
+
+    if output is not None:
+        build_config = replace(build_config, output=str(output))
 
     urls = build_config.urls or []
     typer.echo(
         f"Loaded agentsmd build config from {config.resolve()} ({len(urls)} URL(s))."
     )
 
+    yax = Yax()
+
+    try:
+        generated_path = yax.build_agentsmd(build_config)
+    except Exception as exc:  # pragma: no cover - relies on network errors
+        typer.echo(f"Error building agentsmd: {exc}")
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Generated agents markdown at {generated_path.resolve()}.")
+
 
 if __name__ == "__main__":  # pragma: no cover - manual execution helper
     app()
-
