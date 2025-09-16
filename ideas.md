@@ -44,3 +44,10 @@ build:
 index:
   sources:
   - ...
+
+
+
+Initial index:
+- adr-terraform
+- terraform-gcp-vpc
+- terraform-gcp-gke
