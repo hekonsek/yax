@@ -5,19 +5,14 @@ Files:
 - yax-build-index.yml
 - yax-index.yml
 
-yax.yml
-
 build:
   index:
     from:
   ...
 
-build:
-  agentsmd:
-    from:
-    ...
 
 build:
+  agentsmd:
   from:
     index:
       labels:
@@ -27,10 +22,6 @@ build:
       labels:
       - aws 
 
-build:
-  from:
-    urls:
-      - https://raw.github.com/hekonsek/agents-terraform/_agents.md
 
 build:
   ...
@@ -45,9 +36,10 @@ index:
   sources:
   - ...
 
+Current index:
+- adr-terraform
 
-
-Initial index:
+Target index:
 - adr-terraform
 - terraform-gcp-vpc
 - terraform-gcp-gke
