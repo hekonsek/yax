@@ -19,8 +19,7 @@ class AgentsmdBuildConfig:
         urls = (
             data.get("build", {})
             .get("agentsmd", {})
-            .get("from", {})
-            .get("urls")
+            .get("from")
         )
 
         if urls is None:
