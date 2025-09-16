@@ -29,8 +29,10 @@ def _load_agentsmd_config(config_path: Path) -> AgentsmdBuildConfig:
 
 @agentsmd_app.command()
 def build(
-    config: Path = typer.Argument(
+    config: Path = typer.Option(
         Path(DEFAULT_CONFIG_FILENAME),
+        "--config",
+        "-c",
         resolve_path=True,
         help="Path to the YAML configuration file.",
         show_default=True,
