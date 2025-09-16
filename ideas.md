@@ -27,7 +27,7 @@ build:
 
 build:
   ...
-  target: "_agents.md"
+  output: "_agents.md"
 
 build:
   from:
