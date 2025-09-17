@@ -54,12 +54,12 @@ def build(
     yax = Yax()
 
     try:
-        generated_path = yax.build_agentsmd(build_config)
+        yax.build_agentsmd(build_config)
     except Exception as exc:  # pragma: no cover - relies on network errors
         typer.echo(f"Error building agentsmd: {exc}")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Generated agents markdown at {generated_path.resolve()}.")
+    typer.echo(f"Generated agents markdown at {build_config.output}.")
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution helper
