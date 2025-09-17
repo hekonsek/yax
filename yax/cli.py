@@ -11,6 +11,10 @@ import typer
 from .yax import AgentsmdBuildConfig, Yax
 
 
+def _green(text: str) -> str:
+    return typer.style(str(text), fg=typer.colors.GREEN)
+
+
 DEFAULT_CONFIG_FILENAME = "yax.yml"
 
 app = typer.Typer(help="Interact with Yax features from the command line.", no_args_is_help=True)
@@ -59,7 +63,7 @@ def build(
         typer.echo(f"Error building agentsmd: {exc}")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Generated agents markdown at {build_config.output}.")
+    typer.echo(f"Generated agents markdown at {_green(build_config.output)}.")
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution helper
