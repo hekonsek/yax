@@ -128,9 +128,9 @@ def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
     output_path = tmp_path / "generated" / "AGENTS.md"
     config = AgentsmdBuildConfig(urls=list(url_contents.keys()), output=str(output_path))
 
-    built_path = Yax().build_agentsmd(config)
+    Yax().build_agentsmd(config)
 
-    assert built_path == output_path
+    assert Path(config.output) == output_path
     assert output_path.read_text(encoding="utf-8") == "first content\nsecond content"
 
 

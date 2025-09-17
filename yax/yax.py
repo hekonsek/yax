@@ -50,7 +50,7 @@ class AgentsmdBuildConfig:
 
 class Yax:
     """Core Yax entry point placeholder."""
-    def build_agentsmd(self, config: AgentsmdBuildConfig) -> Path:
+    def build_agentsmd(self, config: AgentsmdBuildConfig) -> None:
         """Download agent markdown fragments and concatenate them into the output file."""
 
         urls = config.urls or []
@@ -69,4 +69,3 @@ class Yax:
         combined_content = "\n".join(fragments)
         output_path.write_text(combined_content, encoding="utf-8")
 
-        return output_path
