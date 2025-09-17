@@ -66,7 +66,6 @@ def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen)
         output_path = Path("AGENTS.md")
 
         assert result.exit_code == 0
-        assert "Loaded agentsmd build config" in result.stdout
         assert "Generated agents markdown" in result.stdout
         assert output_path.read_text(encoding="utf-8") == "downloaded"
 

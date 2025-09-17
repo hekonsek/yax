@@ -51,11 +51,6 @@ def build(
     if output is not None:
         build_config = replace(build_config, output=str(output))
 
-    urls = build_config.urls or []
-    typer.echo(
-        f"Loaded agentsmd build config from {config.resolve()} ({len(urls)} URL(s))."
-    )
-
     yax = Yax()
 
     try:
