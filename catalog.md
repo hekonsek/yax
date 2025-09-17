@@ -6,7 +6,9 @@
 
 - terraform-gcp-vpc
 - terraform-gcp-gke
+- adr-docker-compose
 - adr-adr? 😉
+
 
 ## Artifacts type
 
@@ -16,3 +18,11 @@
 ## Artifacts types TODO
 
 - docker image
+
+## Labels
+
+- terraform
+
+## Labels TODO
+
+- gcp
