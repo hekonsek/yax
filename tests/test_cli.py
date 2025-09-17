@@ -81,3 +81,31 @@ def test_agentsmd_build_honors_output_override():
         assert result.exit_code == 0
         assert output_path.exists()
         assert "Generated agents markdown" in result.stdout
+
+
+def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
+    monkeypatch.setattr(
+        "yax.yax.urlopen",
+        stub_urlopen({"https://example.com/alias.md": "alias output"}),
+    )
+
+    with runner.isolated_filesystem():
+        Path(DEFAULT_CONFIG_FILENAME).write_text(
+            dedent(
+                """
+                build:
+                  agentsmd:
+                    from:
+                      - https://example.com/alias.md
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["build"])
+
+        output_path = Path("AGENTS.md")
+
+        assert result.exit_code == 0
+        assert output_path.read_text(encoding="utf-8") == "alias output"
+        assert "Generated agents markdown" in result.stdout

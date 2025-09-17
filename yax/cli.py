@@ -31,8 +31,27 @@ def _load_agentsmd_config(config_path: Path) -> AgentsmdBuildConfig:
 
     return AgentsmdBuildConfig.open_agentsmd_build_config(str(config_path))
 
-@agentsmd_app.command()
-def build(
+def _build_agentsmd(config: Path, output: Optional[Path]) -> None:
+    """Execute the agentsmd build workflow."""
+
+    build_config = _load_agentsmd_config(config)
+
+    if output is not None:
+        build_config = replace(build_config, output=str(output))
+
+    yax = Yax()
+
+    try:
+        yax.build_agentsmd(build_config)
+    except Exception as exc:  # pragma: no cover - relies on network errors
+        typer.echo(f"Error building agentsmd: {exc}")
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Generated agents markdown at {_green(build_config.output)}.")
+
+
+@agentsmd_app.command("build")
+def agentsmd_build(
     config: Path = typer.Option(
         Path(DEFAULT_CONFIG_FILENAME),
         "--config",
@@ -50,20 +69,29 @@ def build(
 ):
     """Load the agentsmd build configuration and report its status."""
 
-    build_config = _load_agentsmd_config(config)
+    _build_agentsmd(config, output)
 
-    if output is not None:
-        build_config = replace(build_config, output=str(output))
 
-    yax = Yax()
+@app.command("build")
+def build_alias(
+    config: Path = typer.Option(
+        Path(DEFAULT_CONFIG_FILENAME),
+        "--config",
+        "-c",
+        resolve_path=True,
+        help="Path to the YAML configuration file.",
+        show_default=True,
+    ),
+    output: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Override the output file path for the generated AGENTS.md.",
+    ),
+):
+    """Shorter alias for `yax agentsmd build`."""
 
-    try:
-        yax.build_agentsmd(build_config)
-    except Exception as exc:  # pragma: no cover - relies on network errors
-        typer.echo(f"Error building agentsmd: {exc}")
-        raise typer.Exit(code=1)
-
-    typer.echo(f"Generated agents markdown at {_green(build_config.output)}.")
+    _build_agentsmd(config, output)
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution helper
