@@ -15,23 +15,13 @@ build:
 
 build:
   agentsmd:
-  from:
-    index:
+    discover:
       labels:
       - terraform
       - gcp
-    exclude:
+     exclude:
       labels:
       - aws 
-
-
-build:
-  ...
-  output: "_agents.md"
-
-build:
-  from:
-    files: "adrs/*.md"
 
 
 index:
