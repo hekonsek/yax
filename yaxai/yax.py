@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from glob import glob
 from pathlib import Path
 from typing import List, Optional
 from urllib.error import URLError
+from urllib.parse import unquote, urlparse
 from urllib.request import urlopen
 
 import yaml
@@ -57,6 +59,10 @@ class Yax:
 
         fragments: List[str] = []
         for url in urls:
+            if url.startswith("file:"):
+                fragments.extend(self._read_local_sources(url))
+                continue
+
             try:
                 with urlopen(url) as response:
                     fragments.append(response.read().decode("utf-8"))
@@ -69,3 +75,35 @@ class Yax:
         combined_content = "\n".join(fragments)
         output_path.write_text(combined_content, encoding="utf-8")
 
+    def _read_local_sources(self, file_url: str) -> List[str]:
+        """Read and return content fragments for file-based agents sources."""
+
+        parsed = urlparse(file_url)
+        # Accept both file:relative/path and file:///absolute/path patterns.
+        pattern = unquote(parsed.path or "")
+
+        if parsed.netloc:
+            if pattern.startswith("/"):
+                pattern = f"{parsed.netloc}{pattern}"
+            else:
+                pattern = f"{parsed.netloc}/{pattern}"
+
+        if not pattern:
+            raise RuntimeError(f"File source '{file_url}' does not specify a path")
+
+        if pattern.startswith("/"):
+            glob_pattern = pattern
+        else:
+            glob_pattern = str((Path.cwd() / pattern).resolve())
+
+        matches = sorted(Path(match_path) for match_path in glob(glob_pattern, recursive=True))
+
+        file_matches = [path for path in matches if path.is_file()]
+        if not file_matches:
+            raise RuntimeError(f"No files matched pattern '{pattern}' (from '{file_url}')")
+
+        fragments: List[str] = []
+        for path in file_matches:
+            fragments.append(path.read_text(encoding="utf-8"))
+
+        return fragments

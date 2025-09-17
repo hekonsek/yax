@@ -134,6 +134,72 @@ def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
     assert output_path.read_text(encoding="utf-8") == "first content\nsecond content"
 
 
+def test_build_agentsmd_supports_local_file_sources(tmp_path, monkeypatch):
+    fragments_dir = tmp_path / "fragments"
+    fragments_dir.mkdir()
+
+    first = fragments_dir / "a.md"
+    second = fragments_dir / "b.md"
+    first.write_text("first file", encoding="utf-8")
+    second.write_text("second file", encoding="utf-8")
+
+    config_file = _write_config(
+        tmp_path,
+        f"""
+        build:
+          agentsmd:
+            from:
+              - "file:fragments/a.md"
+              - "file:fragments/b.md"
+            output: {tmp_path / "combined.md"}
+        """,
+    )
+
+    config = AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+
+    monkeypatch.chdir(tmp_path)
+    Yax().build_agentsmd(config)
+
+    output_path = Path(config.output)
+    assert output_path.read_text(encoding="utf-8") == "first file\nsecond file"
+
+
+def test_build_agentsmd_glob_expands_and_sorts_matches(tmp_path, monkeypatch):
+    fragments_dir = tmp_path / "fragments"
+    (fragments_dir / "nested").mkdir(parents=True)
+
+    files = {
+        fragments_dir / "nested" / "c.md": "third",
+        fragments_dir / "b.md": "second",
+        fragments_dir / "a.md": "first",
+    }
+
+    for path, contents in files.items():
+        path.write_text(contents, encoding="utf-8")
+
+    config = AgentsmdBuildConfig(
+        urls=["file:fragments/**/*.md"],
+        output=str(tmp_path / "combined.md"),
+    )
+
+    monkeypatch.chdir(tmp_path)
+    Yax().build_agentsmd(config)
+
+    combined = Path(config.output).read_text(encoding="utf-8")
+    assert combined == "first\nsecond\nthird"
+
+
+def test_build_agentsmd_errors_when_glob_matches_nothing(tmp_path, monkeypatch):
+    config = AgentsmdBuildConfig(
+        urls=["file:missing.md"],
+        output=str(tmp_path / "out.md"),
+    )
+
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(RuntimeError):
+        Yax().build_agentsmd(config)
+
+
 def test_build_agentsmd_wraps_url_errors(tmp_path, monkeypatch):
     failing_url = "https://example.com/failure.md"
 

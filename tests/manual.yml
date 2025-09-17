@@ -2,3 +2,4 @@ build:
   agentsmd:
     from:
       - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
+      - file:*.md
