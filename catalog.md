@@ -8,6 +8,8 @@
 - terraform-gcp-gke
 - adr-docker-compose
 - adr-adr? 😉
+- vrz
+- check-depz
 
 
 ## Artifacts type

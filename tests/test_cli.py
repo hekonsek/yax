@@ -4,7 +4,7 @@ from textwrap import dedent
 import pytest
 from typer.testing import CliRunner
 
-from yax.cli import DEFAULT_CONFIG_FILENAME, app
+from yaxai.cli import DEFAULT_CONFIG_FILENAME, app
 
 
 runner = CliRunner()
@@ -44,7 +44,7 @@ def fixture_stub_urlopen():
 
 def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen):
     monkeypatch.setattr(
-        "yax.yax.urlopen",
+        "yaxai.yax.urlopen",
         stub_urlopen({"https://example.com/one.md": "downloaded"}),
     )
 
@@ -85,7 +85,7 @@ def test_agentsmd_build_honors_output_override():
 
 def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
     monkeypatch.setattr(
-        "yax.yax.urlopen",
+        "yaxai.yax.urlopen",
         stub_urlopen({"https://example.com/alias.md": "alias output"}),
     )
 

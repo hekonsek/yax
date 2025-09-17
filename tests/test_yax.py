@@ -5,7 +5,7 @@ import pytest
 
 from urllib.error import URLError
 
-from yax.yax import AgentsmdBuildConfig, DEFAULT_AGENTSMD_OUTPUT, Yax
+from yaxai.yax import AgentsmdBuildConfig, DEFAULT_AGENTSMD_OUTPUT, Yax
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -123,7 +123,7 @@ def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
 
         return _Response(url_contents[url])
 
-    monkeypatch.setattr("yax.yax.urlopen", fake_urlopen)
+    monkeypatch.setattr("yaxai.yax.urlopen", fake_urlopen)
 
     output_path = tmp_path / "generated" / "AGENTS.md"
     config = AgentsmdBuildConfig(urls=list(url_contents.keys()), output=str(output_path))
@@ -140,7 +140,7 @@ def test_build_agentsmd_wraps_url_errors(tmp_path, monkeypatch):
     def fake_urlopen(url):
         raise URLError("boom")
 
-    monkeypatch.setattr("yax.yax.urlopen", fake_urlopen)
+    monkeypatch.setattr("yaxai.yax.urlopen", fake_urlopen)
 
     config = AgentsmdBuildConfig(urls=[failing_url], output=str(tmp_path / "AGENTS.md"))
 
