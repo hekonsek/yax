@@ -131,7 +131,7 @@ def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
     Yax().build_agentsmd(config)
 
     assert Path(config.output) == output_path
-    assert output_path.read_text(encoding="utf-8") == "first content\nsecond content"
+    assert output_path.read_text(encoding="utf-8") == "first content\n\nsecond content"
 
 
 def test_build_agentsmd_supports_local_file_sources(tmp_path, monkeypatch):
@@ -161,7 +161,7 @@ def test_build_agentsmd_supports_local_file_sources(tmp_path, monkeypatch):
     Yax().build_agentsmd(config)
 
     output_path = Path(config.output)
-    assert output_path.read_text(encoding="utf-8") == "first file\nsecond file"
+    assert output_path.read_text(encoding="utf-8") == "first file\n\nsecond file"
 
 
 def test_build_agentsmd_glob_expands_and_sorts_matches(tmp_path, monkeypatch):
@@ -186,7 +186,7 @@ def test_build_agentsmd_glob_expands_and_sorts_matches(tmp_path, monkeypatch):
     Yax().build_agentsmd(config)
 
     combined = Path(config.output).read_text(encoding="utf-8")
-    assert combined == "first\nsecond\nthird"
+    assert combined == "first\n\nsecond\n\nthird"
 
 
 def test_build_agentsmd_errors_when_glob_matches_nothing(tmp_path, monkeypatch):

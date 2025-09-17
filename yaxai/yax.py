@@ -72,7 +72,7 @@ class Yax:
         output_path = Path(config.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        combined_content = "\n".join(fragments)
+        combined_content = "\n\n".join(fragments)
         output_path.write_text(combined_content, encoding="utf-8")
 
     def _read_local_sources(self, file_url: str) -> List[str]:
