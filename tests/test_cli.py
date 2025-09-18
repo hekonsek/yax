@@ -4,7 +4,7 @@ from textwrap import dedent
 import pytest
 from typer.testing import CliRunner
 
-from yaxai.cli import DEFAULT_CONFIG_FILENAME, app
+from yaxai.cli import DEFAULT_CATALOG_CONFIG_FILENAME, DEFAULT_CONFIG_FILENAME, app
 
 
 runner = CliRunner()
@@ -109,3 +109,57 @@ def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
         assert result.exit_code == 0
         assert output_path.read_text(encoding="utf-8") == "alias output"
         assert "Generated agents markdown" in result.stdout
+
+
+def test_catalog_build_missing_config():
+    with runner.isolated_filesystem():
+        result = runner.invoke(app, ["catalog", "build"])
+
+    assert result.exit_code == 1
+    assert "Configuration file not found" in result.stdout
+
+
+def test_catalog_build_creates_json():
+    with runner.isolated_filesystem():
+        Path(DEFAULT_CATALOG_CONFIG_FILENAME).write_text(
+            dedent(
+                """
+                build:
+                  catalog:
+                    organization: example
+                    from:
+                      - https://example.com/catalog.yml
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["catalog", "build"])
+
+        output_path = Path("yax-catalog.json")
+
+        assert result.exit_code == 0
+        assert output_path.exists()
+        assert "Generated catalog" in result.stdout
+
+
+def test_catalog_build_honors_output_override():
+    with runner.isolated_filesystem():
+        Path(DEFAULT_CATALOG_CONFIG_FILENAME).write_text(
+            dedent(
+                """
+                build:
+                  catalog:
+                    organization: example
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["catalog", "build", "--output", "dist/catalog.json"])
+
+        output_path = Path("dist/catalog.json")
+
+        assert result.exit_code == 0
+        assert output_path.exists()
+        assert "Generated catalog" in result.stdout

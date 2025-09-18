@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass, field
 from glob import glob
 from pathlib import Path
 from typing import List, Optional
@@ -50,6 +51,68 @@ class AgentsmdBuildConfig:
         return cls(urls=normalized_urls, output=output)
 
 
+DEFAULT_CATALOG_OUTPUT = "yax-catalog.json"
+
+
+@dataclass
+class CatalogBuildConfig:
+    organization: str
+    sources: List[str] = field(default_factory=list)
+    output: str = DEFAULT_CATALOG_OUTPUT
+
+    @classmethod
+    def open_catalog_build_config(cls, config_file_path: str) -> "CatalogBuildConfig":
+        """Load catalog build configuration from YAML file."""
+
+        with open(config_file_path, "r", encoding="utf-8") as config_file:
+            data = yaml.safe_load(config_file) or {}
+
+        catalog_section = data.get("build", {}).get("catalog", {})
+
+        organization = catalog_section.get("organization")
+        if not isinstance(organization, str) or not organization.strip():
+            raise ValueError("Expected 'organization' to be a non-empty string in config file")
+        organization = organization.strip()
+
+        raw_sources = catalog_section.get("from", [])
+        if raw_sources is None:
+            raw_sources = []
+        if not isinstance(raw_sources, list):
+            raise ValueError("Expected 'from' to be a list of strings in config file")
+
+        sources: List[str] = []
+        for source in raw_sources:
+            if not isinstance(source, str):
+                raise ValueError("Expected every entry in 'from' to be a string")
+            stripped = source.strip()
+            if stripped:
+                sources.append(stripped)
+
+        output = catalog_section.get("output", DEFAULT_CATALOG_OUTPUT)
+        if output is None:
+            output = DEFAULT_CATALOG_OUTPUT
+        if not isinstance(output, str):
+            raise ValueError("Expected 'output' to be a string in config file")
+
+        return cls(organization=organization, sources=sources, output=output)
+
+
+@dataclass
+class CatalogCollection:
+    url: str
+
+
+@dataclass
+class CatalogOrganization:
+    name: str
+    collections: List[CatalogCollection] = field(default_factory=list)
+
+
+@dataclass
+class Catalog:
+    organizations: List[CatalogOrganization] = field(default_factory=list)
+
+
 class Yax:
     """Core Yax entry point placeholder."""
     def build_agentsmd(self, config: AgentsmdBuildConfig) -> None:
@@ -74,6 +137,26 @@ class Yax:
 
         combined_content = "\n\n".join(fragments)
         output_path.write_text(combined_content, encoding="utf-8")
+
+    def build_catalog(self, config: CatalogBuildConfig) -> None:
+        """Construct a catalog JSON document based on the provided configuration."""
+
+        catalog = Catalog(
+            organizations=[
+                CatalogOrganization(
+                    name=config.organization,
+                    collections=[CatalogCollection(url=source) for source in config.sources],
+                )
+            ]
+        )
+
+        output_path = Path(config.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        output_path.write_text(
+            json.dumps(asdict(catalog), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
 
     def _read_local_sources(self, file_url: str) -> List[str]:
         """Read and return content fragments for file-based agents sources."""
