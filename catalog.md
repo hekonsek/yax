@@ -20,6 +20,7 @@
 ## Artifacts types TODO
 
 - docker image
+- github actions
 
 ## Labels
 
