@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from glob import glob
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from urllib.error import URLError
 from urllib.parse import unquote, urlparse
 from urllib.request import urlopen
@@ -101,16 +101,57 @@ class CatalogBuildConfig:
 class CatalogCollection:
     url: str
 
+    @classmethod
+    def from_mapping(cls, data: Any) -> "CatalogCollection":
+        if not isinstance(data, dict):
+            raise ValueError("Expected collection entry to be an object")
+
+        url = data.get("url", "")
+        if isinstance(url, str):
+            return cls(url=url.strip())
+
+        raise ValueError("Expected collection 'url' to be a string")
+
 
 @dataclass
 class CatalogOrganization:
     name: str
     collections: List[CatalogCollection] = field(default_factory=list)
 
+    @classmethod
+    def from_mapping(cls, data: Any) -> "CatalogOrganization":
+        if not isinstance(data, dict):
+            raise ValueError("Expected organization entry to be an object")
+
+        name_value = data.get("name", "")
+        if not isinstance(name_value, str):
+            raise ValueError("Expected organization 'name' to be a string")
+
+        collections_raw = data.get("collections", [])
+        if not isinstance(collections_raw, list):
+            raise ValueError("Expected organization 'collections' to be a list")
+
+        collections = [CatalogCollection.from_mapping(entry) for entry in collections_raw]
+
+        return cls(name=name_value.strip(), collections=collections)
+
 
 @dataclass
 class Catalog:
     organizations: List[CatalogOrganization] = field(default_factory=list)
+
+    @classmethod
+    def from_mapping(cls, data: Any) -> "Catalog":
+        if not isinstance(data, dict):
+            raise ValueError("Catalog JSON must be an object")
+
+        organizations_raw = data.get("organizations", [])
+        if not isinstance(organizations_raw, list):
+            raise ValueError("Catalog 'organizations' must be a list")
+
+        organizations = [CatalogOrganization.from_mapping(entry) for entry in organizations_raw]
+
+        return cls(organizations=organizations)
 
 
 class Yax:
@@ -158,6 +199,32 @@ class Yax:
             encoding="utf-8",
         )
 
+    def export_catalog(self, source: Path, format_name: str) -> Path:
+        """Export the catalog JSON into the requested format and return output path."""
+
+        if not source.exists():
+            raise FileNotFoundError(f"Catalog source '{source}' was not found")
+
+        try:
+            catalog_data = json.loads(source.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid catalog JSON in '{source}': {exc}") from exc
+
+        normalized_format = format_name.strip().lower()
+
+        catalog = Catalog.from_mapping(catalog_data)
+
+        if normalized_format == "markdown":
+            output_path = source.with_suffix(".md")
+            content = self._catalog_to_markdown(catalog)
+        else:
+            raise ValueError(f"Unsupported export format '{format_name}'")
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(content, encoding="utf-8")
+
+        return output_path
+
     def _read_local_sources(self, file_url: str) -> List[str]:
         """Read and return content fragments for file-based agents sources."""
 
@@ -190,3 +257,35 @@ class Yax:
             fragments.append(path.read_text(encoding="utf-8"))
 
         return fragments
+
+    def _catalog_to_markdown(self, catalog: Catalog) -> str:
+        """Convert catalog structure into a readable markdown document."""
+
+        lines: List[str] = ["# Catalog"]
+
+        if not catalog.organizations:
+            lines.append("")
+            lines.append("_No organizations defined._")
+            lines.append("")
+            return "\n".join(lines)
+
+        for organization in catalog.organizations:
+            name = organization.name or "Unnamed organization"
+
+            lines.append("")
+            lines.append(f"## {name}")
+            lines.append("")
+
+            if not organization.collections:
+                lines.append("_No collections defined._")
+                continue
+
+            for collection in organization.collections:
+                url = collection.url.strip()
+                if url:
+                    lines.append(f"- {url}")
+                else:
+                    lines.append("- (missing url)")
+
+        lines.append("")
+        return "\n".join(lines)

@@ -8,7 +8,7 @@ from typing import Optional
 
 import typer
 
-from .yax import AgentsmdBuildConfig, CatalogBuildConfig, Yax
+from .yax import DEFAULT_CATALOG_OUTPUT, AgentsmdBuildConfig, CatalogBuildConfig, Yax
 
 
 def _green(text: str) -> str:
@@ -17,6 +17,7 @@ def _green(text: str) -> str:
 
 DEFAULT_CONFIG_FILENAME = "yax.yml"
 DEFAULT_CATALOG_CONFIG_FILENAME = "yax-catalog.yml"
+DEFAULT_CATALOG_SOURCE_FILENAME = DEFAULT_CATALOG_OUTPUT
 
 app = typer.Typer(help="Interact with Yax features from the command line.", no_args_is_help=True)
 
@@ -82,6 +83,24 @@ def _build_catalog(config: Path, output: Optional[Path]) -> None:
     typer.echo(f"Generated catalog at {_green(build_config.output)}.")
 
 
+def _export_catalog(source: Path, format_name: str) -> None:
+    """Export catalog JSON into the requested format."""
+
+    if not source.exists():
+        typer.echo(f"Catalog source file not found: {source}")
+        raise typer.Exit(code=1)
+
+    yax = Yax()
+
+    try:
+        output_path = yax.export_catalog(source, format_name)
+    except Exception as exc:  # pragma: no cover - relies on filesystem and parsing errors
+        typer.echo(f"Error exporting catalog: {exc}")
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Exported catalog to {_green(output_path)}.")
+
+
 @agentsmd_app.command("build")
 def agentsmd_build(
     config: Path = typer.Option(
@@ -145,6 +164,29 @@ def catalog_build(
     """Build the catalog JSON artifact."""
 
     _build_catalog(config, output)
+
+
+@catalog_app.command("export")
+def catalog_export(
+    source: Path = typer.Option(
+        Path(DEFAULT_CATALOG_SOURCE_FILENAME),
+        "--source",
+        "-s",
+        resolve_path=True,
+        help="Path to the catalog JSON file to export.",
+        show_default=True,
+    ),
+    format_name: str = typer.Option(
+        "markdown",
+        "--format",
+        "-f",
+        help="Output format for the exported catalog.",
+        show_default=True,
+    ),
+):
+    """Export the catalog JSON into alternative formats."""
+
+    _export_catalog(source, format_name)
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution helper

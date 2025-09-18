@@ -328,3 +328,43 @@ def test_build_catalog_writes_expected_json(tmp_path):
             }
         ]
     }
+
+
+def test_export_catalog_writes_markdown(tmp_path):
+    source = tmp_path / "catalog.json"
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example Org",
+                "collections": [
+                    {"url": "https://example.com/one.yml"},
+                    {"url": "https://example.com/two.yml"},
+                ],
+            }
+        ]
+    }
+    source.write_text(json.dumps(catalog_data), encoding="utf-8")
+
+    output_path = Yax().export_catalog(source, "markdown")
+
+    assert output_path == source.with_suffix(".md")
+    assert output_path.read_text(encoding="utf-8") == (
+        "# Catalog\n\n## Example Org\n\n- https://example.com/one.yml\n"
+        "- https://example.com/two.yml\n"
+    )
+
+
+def test_export_catalog_rejects_invalid_json(tmp_path):
+    source = tmp_path / "catalog.json"
+    source.write_text("not json", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        Yax().export_catalog(source, "markdown")
+
+
+def test_export_catalog_rejects_unknown_format(tmp_path):
+    source = tmp_path / "catalog.json"
+    source.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        Yax().export_catalog(source, "unsupported")

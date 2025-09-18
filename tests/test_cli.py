@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from textwrap import dedent
 
@@ -163,3 +164,60 @@ def test_catalog_build_honors_output_override():
         assert result.exit_code == 0
         assert output_path.exists()
         assert "Generated catalog" in result.stdout
+
+
+def test_catalog_export_missing_source():
+    with runner.isolated_filesystem():
+        result = runner.invoke(app, ["catalog", "export"])
+
+    assert result.exit_code == 1
+    assert "Catalog source file not found" in result.stdout
+
+
+def test_catalog_export_writes_markdown():
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example",
+                "collections": [{"url": "https://example.com/catalog.yml"}],
+            }
+        ]
+    }
+
+    with runner.isolated_filesystem():
+        Path("yax-catalog.json").write_text(
+            json.dumps(catalog_data),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["catalog", "export"])
+
+        output_path = Path("yax-catalog.md")
+
+        assert result.exit_code == 0
+        assert output_path.read_text(encoding="utf-8") == (
+            "# Catalog\n\n## Example\n\n- https://example.com/catalog.yml\n"
+        )
+        assert "Exported catalog" in result.stdout
+
+
+def test_catalog_export_reports_unsupported_format():
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example",
+                "collections": [{"url": "https://example.com/catalog.yml"}],
+            }
+        ]
+    }
+
+    with runner.isolated_filesystem():
+        Path("yax-catalog.json").write_text(
+            json.dumps(catalog_data),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["catalog", "export", "--format", "txt"])
+
+        assert result.exit_code == 1
+        assert "Unsupported export format" in result.stdout
