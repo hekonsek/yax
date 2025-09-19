@@ -22,5 +22,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install project
         run: poetry install
+      - name: Run check-depz
+        run: poetry run check-depz
       - name: Run tests
         run: poetry run pytest
