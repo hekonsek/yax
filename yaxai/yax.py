@@ -21,7 +21,7 @@ class AgentsmdBuildConfig:
     output: str = DEFAULT_AGENTSMD_OUTPUT
 
     @classmethod
-    def open_agentsmd_build_config(cls, config_file_path: str) -> "AgentsmdBuildConfig":
+    def open_agentsmd_build_config(cls, config_file_path: str | Path) -> "AgentsmdBuildConfig":
         """Load Agentsmd build configuration from YAML file."""
         with open(config_file_path, "r", encoding="utf-8") as config_file:
             data = yaml.safe_load(config_file) or {}
@@ -61,7 +61,7 @@ class CatalogBuildConfig:
     output: str = DEFAULT_CATALOG_OUTPUT
 
     @classmethod
-    def open_catalog_build_config(cls, config_file_path: str) -> "CatalogBuildConfig":
+    def open_catalog_build_config(cls, config_file_path: str | Path) -> "CatalogBuildConfig":
         """Load catalog build configuration from YAML file."""
 
         with open(config_file_path, "r", encoding="utf-8") as config_file:
