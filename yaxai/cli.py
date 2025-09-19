@@ -17,7 +17,7 @@ from .yax import (
 )
 
 
-def _green(text: str) -> str:
+def _green(text: str | Path) -> str:
     return typer.style(str(text), fg=typer.colors.GREEN)
 
 
@@ -42,7 +42,7 @@ def _load_agentsmd_config(config_path: Path) -> AgentsmdBuildConfig:
         raise typer.Exit(code=1)
 
     if resolved_config_path != config_path:
-        typer.echo(f"Using fallback configuration file: {resolved_config_path}")
+        typer.echo(f"Using fallback configuration file: {_green(resolved_config_path)}")
 
     return AgentsmdBuildConfig.parse_yml(str(resolved_config_path))
 
@@ -62,7 +62,7 @@ def _build_agentsmd(config: Path, output: Optional[Path]) -> None:
         typer.echo(f"Error building agentsmd: {exc}")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Generated agents markdown at {_green(build_config.output)}.")
+    typer.echo(f"Generated agents markdown: {_green(build_config.output)}.")
 
 
 def _load_catalog_config(config_path: Path) -> CatalogBuildConfig:

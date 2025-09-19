@@ -57,7 +57,7 @@ def test_agentsmd_build_uses_parent_fallback_config(monkeypatch, stub_urlopen):
         assert output_path.exists()
         assert output_path.read_text(encoding="utf-8") == "from fallback"
         assert f"Using fallback configuration file: {fallback_path}" in result.stdout
-        assert "Generated agents markdown" in result.stdout
+        assert "Generated agents markdown: " in result.stdout
 
 
 @pytest.fixture(name="stub_urlopen")
@@ -108,7 +108,7 @@ def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen)
         output_path = Path("AGENTS.md")
 
         assert result.exit_code == 0
-        assert "Generated agents markdown" in result.stdout
+        assert "Generated agents markdown: " in result.stdout
         assert output_path.read_text(encoding="utf-8") == "downloaded"
 
 
@@ -138,7 +138,7 @@ def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
         assert result.exit_code == 0
         assert output_path.exists()
         assert output_path.read_text(encoding="utf-8") == "override output"
-        assert "Generated agents markdown" in result.stdout
+        assert "Generated agents markdown: " in result.stdout
 
 
 def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
@@ -166,7 +166,7 @@ def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
 
         assert result.exit_code == 0
         assert output_path.read_text(encoding="utf-8") == "alias output"
-        assert "Generated agents markdown" in result.stdout
+        assert "Generated agents markdown: " in result.stdout
 
 
 def test_catalog_build_missing_config():
