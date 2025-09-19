@@ -14,7 +14,7 @@ def _write_config(tmp_path: Path, contents: str) -> Path:
     return config_path
 
 
-def test_open_agentsmd_build_config_defaults(tmp_path):
+def test_parse_yml_defaults(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -25,14 +25,14 @@ def test_open_agentsmd_build_config_defaults(tmp_path):
         """,
     )
 
-    config = AgentsmdBuildConfig.open_agentsmd_build_config(config_file)
+    config = AgentsmdBuildConfig.parse_yml(config_file)
 
     assert config.urls is not None
     assert len(config.urls) == 1
     assert config.output == DEFAULT_AGENTSMD_OUTPUT
 
 
-def test_open_agentsmd_build_config_with_urls_and_output(tmp_path):
+def test_parse_yml_with_urls_and_output(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -45,13 +45,13 @@ def test_open_agentsmd_build_config_with_urls_and_output(tmp_path):
         """,
     )
 
-    config = AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+    config = AgentsmdBuildConfig.parse_yml(str(config_file))
 
     assert config.urls == ["https://example.com/a.md", "https://example.com/b.md"]
     assert config.output == "docs/AGENTS.md"
 
 
-def test_open_agentsmd_build_config_treats_none_output_as_default(tmp_path):
+def test_parse_yml_treats_none_output_as_default(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -63,12 +63,12 @@ def test_open_agentsmd_build_config_treats_none_output_as_default(tmp_path):
         """,
     )
 
-    config = AgentsmdBuildConfig.open_agentsmd_build_config(config_file)
+    config = AgentsmdBuildConfig.parse_yml(config_file)
 
     assert config.output == DEFAULT_AGENTSMD_OUTPUT
 
 
-def test_open_agentsmd_build_config_rejects_non_string_output(tmp_path):
+def test_parse_yml_rejects_non_string_output(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -80,10 +80,10 @@ def test_open_agentsmd_build_config_rejects_non_string_output(tmp_path):
     )
 
     with pytest.raises(ValueError):
-        AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+        AgentsmdBuildConfig.parse_yml(str(config_file))
 
 
-def test_open_agentsmd_build_config_requires_urls_list(tmp_path):
+def test_parse_yml_requires_urls_list(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -94,10 +94,10 @@ def test_open_agentsmd_build_config_requires_urls_list(tmp_path):
     )
 
     with pytest.raises(ValueError):
-        AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+        AgentsmdBuildConfig.parse_yml(str(config_file))
 
 
-def test_open_agentsmd_build_config_requires_string_urls(tmp_path):
+def test_parse_yml_requires_string_urls(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -109,9 +109,9 @@ def test_open_agentsmd_build_config_requires_string_urls(tmp_path):
     )
 
     with pytest.raises(ValueError):
-        AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+        AgentsmdBuildConfig.parse_yml(str(config_file))
 
-def test_open_agentsmd_build_config_rejects_empty_urls(tmp_path):
+def test_parse_yml_rejects_empty_urls(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -122,9 +122,9 @@ def test_open_agentsmd_build_config_rejects_empty_urls(tmp_path):
     )
 
     with pytest.raises(ValueError):
-        AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+        AgentsmdBuildConfig.parse_yml(str(config_file))
 
-def test_open_agentsmd_build_config_rejects_blank_urls(tmp_path):
+def test_parse_yml_rejects_blank_urls(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -136,7 +136,7 @@ def test_open_agentsmd_build_config_rejects_blank_urls(tmp_path):
     )
 
     with pytest.raises(ValueError):
-        AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+        AgentsmdBuildConfig.parse_yml(str(config_file))
 
 
 def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
@@ -193,7 +193,7 @@ def test_build_agentsmd_supports_local_file_sources(tmp_path, monkeypatch):
         """,
     )
 
-    config = AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+    config = AgentsmdBuildConfig.parse_yml(str(config_file))
 
     monkeypatch.chdir(tmp_path)
     Yax().build_agentsmd(config)

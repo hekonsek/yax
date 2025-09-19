@@ -33,7 +33,7 @@ def _load_agentsmd_config(config_path: Path) -> AgentsmdBuildConfig:
         typer.echo(f"Configuration file not found: {config_path}")
         raise typer.Exit(code=1)
 
-    return AgentsmdBuildConfig.open_agentsmd_build_config(str(config_path))
+    return AgentsmdBuildConfig.parse_yml(str(config_path))
 
 def _build_agentsmd(config: Path, output: Optional[Path]) -> None:
     """Execute the agentsmd build workflow."""
