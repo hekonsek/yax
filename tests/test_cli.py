@@ -1,3 +1,4 @@
+import os
 import json
 from pathlib import Path
 from textwrap import dedent
@@ -17,6 +18,46 @@ def test_agentsmd_build_missing_config():
 
     assert result.exit_code == 1
     assert "Configuration file not found" in result.stdout
+
+
+def test_agentsmd_build_uses_parent_fallback_config(monkeypatch, stub_urlopen):
+    monkeypatch.setattr(
+        "yaxai.yax.urlopen",
+        stub_urlopen({"https://example.com/fallback.md": "from fallback"}),
+    )
+
+    with runner.isolated_filesystem():
+        root_dir = Path.cwd()
+        project_dir = root_dir / "fooproject"
+        project_dir.mkdir()
+
+        fallback_path = root_dir / f"{project_dir.name}-{DEFAULT_CONFIG_FILENAME}"
+        fallback_path.write_text(
+            dedent(
+                """
+                build:
+                  agentsmd:
+                    from:
+                      - https://example.com/fallback.md
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(project_dir)
+            result = runner.invoke(app, ["agentsmd", "build"])
+        finally:
+            os.chdir(original_cwd)
+
+        output_path = project_dir / "AGENTS.md"
+
+        assert result.exit_code == 0
+        assert output_path.exists()
+        assert output_path.read_text(encoding="utf-8") == "from fallback"
+        assert f"Using fallback configuration file: {fallback_path}" in result.stdout
+        assert "Generated agents markdown" in result.stdout
 
 
 @pytest.fixture(name="stub_urlopen")

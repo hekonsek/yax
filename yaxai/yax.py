@@ -13,12 +13,39 @@ import yaml
 
 
 DEFAULT_AGENTSMD_OUTPUT = "AGENTS.md"
+DEFAULT_AGENTSMD_CONFIG_FILENAME = "yax.yml"
 
 
 @dataclass
 class AgentsmdBuildConfig:
     urls: Optional[List[str]] = None
     output: str = DEFAULT_AGENTSMD_OUTPUT
+
+    @staticmethod
+    def resolve_config_path(
+        config_path: Path
+    ) -> Path:
+        """Resolve the expected config path, allowing parent fallback for defaults."""
+
+        config_path = Path(config_path)
+        if not config_path.is_absolute():
+            config_path = config_path.resolve(strict=False)
+
+        if config_path.exists():
+            return config_path
+
+        cwd = Path.cwd()
+        is_default_selection = (
+            config_path.name == DEFAULT_AGENTSMD_CONFIG_FILENAME
+            and config_path.parent == cwd
+        )
+
+        if is_default_selection and cwd.parent != cwd and cwd.name:
+            fallback_path = cwd.parent / f"{cwd.name}-{DEFAULT_AGENTSMD_CONFIG_FILENAME}"
+            if fallback_path.exists():
+                return fallback_path
+
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
     @classmethod
     def parse_yml(cls, config_file_path: str | Path) -> AgentsmdBuildConfig:

@@ -8,14 +8,20 @@ from typing import Optional
 
 import typer
 
-from .yax import DEFAULT_CATALOG_OUTPUT, AgentsmdBuildConfig, CatalogBuildConfig, Yax
+from .yax import (
+    DEFAULT_AGENTSMD_CONFIG_FILENAME,
+    DEFAULT_CATALOG_OUTPUT,
+    AgentsmdBuildConfig,
+    CatalogBuildConfig,
+    Yax,
+)
 
 
 def _green(text: str) -> str:
     return typer.style(str(text), fg=typer.colors.GREEN)
 
 
-DEFAULT_CONFIG_FILENAME = "yax.yml"
+DEFAULT_CONFIG_FILENAME = DEFAULT_AGENTSMD_CONFIG_FILENAME
 DEFAULT_CATALOG_CONFIG_FILENAME = "yax-catalog.yml"
 DEFAULT_CATALOG_SOURCE_FILENAME = DEFAULT_CATALOG_OUTPUT
 
@@ -29,11 +35,16 @@ app.add_typer(catalog_app, name="catalog")
 def _load_agentsmd_config(config_path: Path) -> AgentsmdBuildConfig:
     """Load and return the agentsmd build configuration from the provided path."""
 
-    if not config_path.exists():
-        typer.echo(f"Configuration file not found: {config_path}")
+    try:
+        resolved_config_path = AgentsmdBuildConfig.resolve_config_path(config_path)
+    except FileNotFoundError as exc:
+        typer.echo(str(exc))
         raise typer.Exit(code=1)
 
-    return AgentsmdBuildConfig.parse_yml(str(config_path))
+    if resolved_config_path != config_path:
+        typer.echo(f"Using fallback configuration file: {resolved_config_path}")
+
+    return AgentsmdBuildConfig.parse_yml(str(resolved_config_path))
 
 def _build_agentsmd(config: Path, output: Optional[Path]) -> None:
     """Execute the agentsmd build workflow."""

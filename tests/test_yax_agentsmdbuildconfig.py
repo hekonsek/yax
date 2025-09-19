@@ -5,7 +5,12 @@ import pytest
 
 from urllib.error import URLError
 
-from yaxai.yax import AgentsmdBuildConfig, DEFAULT_AGENTSMD_OUTPUT, Yax
+from yaxai.yax import (
+    AgentsmdBuildConfig,
+    DEFAULT_AGENTSMD_CONFIG_FILENAME,
+    DEFAULT_AGENTSMD_OUTPUT,
+    Yax,
+)
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -30,6 +35,45 @@ def test_parse_yml_defaults(tmp_path):
     assert config.urls is not None
     assert len(config.urls) == 1
     assert config.output == DEFAULT_AGENTSMD_OUTPUT
+
+
+def test_resolve_config_path_returns_existing_file(tmp_path, monkeypatch):
+    project_dir = tmp_path / "sample"
+    project_dir.mkdir()
+    config_path = project_dir / DEFAULT_AGENTSMD_CONFIG_FILENAME
+    config_path.write_text("", encoding="utf-8")
+
+    monkeypatch.chdir(project_dir)
+
+    resolved = AgentsmdBuildConfig.resolve_config_path(Path(DEFAULT_AGENTSMD_CONFIG_FILENAME))
+
+    assert resolved == config_path
+
+
+def test_resolve_config_path_falls_back_to_parent(tmp_path, monkeypatch):
+    root_dir = tmp_path
+    project_dir = root_dir / "fooproject"
+    project_dir.mkdir()
+    fallback_path = root_dir / f"{project_dir.name}-{DEFAULT_AGENTSMD_CONFIG_FILENAME}"
+    fallback_path.write_text("", encoding="utf-8")
+
+    monkeypatch.chdir(project_dir)
+
+    resolved = AgentsmdBuildConfig.resolve_config_path(Path(DEFAULT_AGENTSMD_CONFIG_FILENAME))
+
+    assert resolved == fallback_path
+
+
+def test_resolve_config_path_missing_raises(tmp_path, monkeypatch):
+    project_dir = tmp_path / "missing"
+    project_dir.mkdir()
+
+    monkeypatch.chdir(project_dir)
+
+    with pytest.raises(FileNotFoundError) as error:
+        AgentsmdBuildConfig.resolve_config_path(Path(DEFAULT_AGENTSMD_CONFIG_FILENAME))
+
+    assert "Configuration file not found" in str(error.value)
 
 
 def test_parse_yml_with_urls_and_output(tmp_path):
