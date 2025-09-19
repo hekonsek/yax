@@ -111,6 +111,33 @@ def test_open_agentsmd_build_config_requires_string_urls(tmp_path):
     with pytest.raises(ValueError):
         AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
 
+def test_open_agentsmd_build_config_rejects_empty_urls(tmp_path):
+    config_file = _write_config(
+        tmp_path,
+        """
+        build:
+          agentsmd:
+            from: []
+        """,
+    )
+
+    with pytest.raises(ValueError):
+        AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+
+def test_open_agentsmd_build_config_rejects_blank_urls(tmp_path):
+    config_file = _write_config(
+        tmp_path,
+        """
+        build:
+          agentsmd:
+            from:
+              - "  "
+        """,
+    )
+
+    with pytest.raises(ValueError):
+        AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+
 
 def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
     url_contents = {

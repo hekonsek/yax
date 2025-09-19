@@ -36,7 +36,7 @@ class AgentsmdBuildConfig:
         if not isinstance(output, str):
             raise ValueError("Expected 'output' to be a string in config file")
 
-        if urls is None:
+        if urls is None or len(urls) == 0:
             raise ValueError("Agentsmd build config must specify at least one source URL in 'build.agentsmd.from'")
 
         if not isinstance(urls, list):
