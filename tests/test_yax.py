@@ -22,11 +22,20 @@ def _write_config(tmp_path: Path, contents: str) -> Path:
 
 
 def test_open_agentsmd_build_config_defaults(tmp_path):
-    config_file = _write_config(tmp_path, "")
+    config_file = _write_config(
+        tmp_path,
+        """
+        build:
+          agentsmd:
+            from:
+              - https://example.com/source.md
+        """,
+    )
 
-    config = AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+    config = AgentsmdBuildConfig.open_agentsmd_build_config(config_file)
 
-    assert config.urls is None
+    assert config.urls is not None
+    assert len(config.urls) == 1
     assert config.output == DEFAULT_AGENTSMD_OUTPUT
 
 
@@ -55,11 +64,13 @@ def test_open_agentsmd_build_config_treats_none_output_as_default(tmp_path):
         """
         build:
           agentsmd:
+            from:
+              - https://example.com/a.md
             output: null
         """,
     )
 
-    config = AgentsmdBuildConfig.open_agentsmd_build_config(str(config_file))
+    config = AgentsmdBuildConfig.open_agentsmd_build_config(config_file)
 
     assert config.output == DEFAULT_AGENTSMD_OUTPUT
 

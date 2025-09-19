@@ -71,9 +71,24 @@ def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen)
         assert output_path.read_text(encoding="utf-8") == "downloaded"
 
 
-def test_agentsmd_build_honors_output_override():
+def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
+    monkeypatch.setattr(
+        "yaxai.yax.urlopen",
+        stub_urlopen({"https://example.com/override.md": "override output"}),
+    )
+
     with runner.isolated_filesystem():
-        Path(DEFAULT_CONFIG_FILENAME).write_text("", encoding="utf-8")
+        Path(DEFAULT_CONFIG_FILENAME).write_text(
+            dedent(
+                """
+                build:
+                  agentsmd:
+                    from:
+                      - https://example.com/override.md
+                """
+            ),
+            encoding="utf-8",
+        )
 
         result = runner.invoke(app, ["agentsmd", "build", "--output", "docs/output.md"])
 
@@ -81,6 +96,7 @@ def test_agentsmd_build_honors_output_override():
 
         assert result.exit_code == 0
         assert output_path.exists()
+        assert output_path.read_text(encoding="utf-8") == "override output"
         assert "Generated agents markdown" in result.stdout
 
 

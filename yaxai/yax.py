@@ -37,16 +37,20 @@ class AgentsmdBuildConfig:
             raise ValueError("Expected 'output' to be a string in config file")
 
         if urls is None:
-            return cls(output=output)
+            raise ValueError("Agentsmd build config must specify at least one source URL in 'build.agentsmd.from'")
 
         if not isinstance(urls, list):
-            raise ValueError("Expected 'urls' to be a list of strings in config file")
+            raise ValueError("Expected 'from' to be a list of strings in config file")
 
         normalized_urls: List[str] = []
         for url in urls:
             if not isinstance(url, str):
-                raise ValueError("Expected every entry in 'urls' to be a string")
-            normalized_urls.append(url)
+                raise ValueError("Expected every entry in 'from' to be a string")
+            stripped_url = url.strip()
+            if stripped_url:
+                normalized_urls.append(stripped_url)
+            else:
+                raise ValueError("Source URLs in 'build.agentsmd.from' must be non-empty strings")
 
         return cls(urls=normalized_urls, output=output)
 
