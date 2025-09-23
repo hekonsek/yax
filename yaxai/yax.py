@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from dataclasses import asdict, dataclass, field
 from glob import glob
 from pathlib import Path
 from typing import Any, List, Optional
-from urllib.error import URLError
-from urllib.parse import unquote, urlparse
-from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
+from urllib.parse import ParseResult, quote, unquote, urlparse
+from urllib.request import Request, urlopen
 
 import yaml
 
@@ -187,6 +188,12 @@ class Catalog:
 
 class Yax:
     """Core Yax entry point placeholder."""
+
+    USER_AGENT = "yax/1.0"
+
+    def __init__(self) -> None:
+        self._github_token: Optional[str] = None
+
     def build_agentsmd(self, config: AgentsmdBuildConfig) -> None:
         """Download agent markdown fragments and concatenate them into the output file."""
 
@@ -198,17 +205,180 @@ class Yax:
                 fragments.extend(self._read_local_sources(url))
                 continue
 
-            try:
-                with urlopen(url) as response:
-                    fragments.append(response.read().decode("utf-8"))
-            except URLError as exc:  # pragma: no cover - network/IO error path
-                raise RuntimeError(f"Failed to download '{url}': {exc}") from exc
+            fragments.append(self._download_remote_source(url))
 
         output_path = Path(config.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         combined_content = "\n\n".join(fragments)
         output_path.write_text(combined_content, encoding="utf-8")
+
+    def _download_remote_source(self, url: str) -> str:
+        """Retrieve remote source content with GitHub authentication support."""
+
+        parsed = urlparse(url)
+        scheme = parsed.scheme.lower()
+        if scheme not in {"http", "https"}:
+            raise RuntimeError(f"Unsupported URL scheme for '{url}'")
+
+        host = parsed.netloc.lower()
+
+        if host == "raw.githubusercontent.com":
+            return self._download_github_raw_with_fallback(parsed, url)
+
+        if host in {"github.com", "www.github.com"}:
+            return self._download_github_ui_url(parsed, url)
+
+        try:
+            return self._download_plain(url)
+        except URLError as exc:  # pragma: no cover - network/IO error path
+            raise RuntimeError(f"Failed to download '{url}': {exc}") from exc
+
+    def _download_plain(self, url: str, extra_headers: Optional[dict[str, str]] = None) -> str:
+        """Download text content from a URL using optional extra headers."""
+
+        if extra_headers:
+            headers = self._build_request_headers(extra_headers)
+            request = Request(url, headers=headers)
+            opener_target = request
+        else:
+            opener_target = url
+
+        with urlopen(opener_target) as response:
+            return response.read().decode("utf-8")
+
+    def _build_request_headers(self, extra_headers: dict[str, str]) -> dict[str, str]:
+        headers: dict[str, str] = {"User-Agent": self.USER_AGENT}
+        headers.update(extra_headers)
+        return headers
+
+    def _download_github_raw_with_fallback(self, parsed: ParseResult, original_url: str) -> str:
+        """Attempt raw download, falling back to the API for private content."""
+
+        try:
+            return self._download_plain(original_url)
+        except HTTPError as exc:
+            if exc.code in {401, 403, 404}:
+                return self._download_github_from_segments(parsed, original_url)
+            raise RuntimeError(f"Failed to download '{original_url}': {exc}") from exc
+        except URLError as exc:  # pragma: no cover - network/IO error path
+            raise RuntimeError(f"Failed to download '{original_url}': {exc}") from exc
+
+    def _download_github_ui_url(self, parsed: ParseResult, original_url: str) -> str:
+        """Download a GitHub UI URL via the REST API using authentication."""
+
+        segments = [segment for segment in parsed.path.lstrip("/").split("/") if segment]
+        if len(segments) < 5:
+            raise RuntimeError(
+                "GitHub URL must include owner, repo, ref, and file path (expected '/<owner>/<repo>/blob/<ref>/<file>')."
+            )
+
+        owner, repo = segments[0], segments[1]
+        marker = segments[2]
+
+        if marker not in {"blob", "raw"}:
+            raise RuntimeError(
+                "GitHub URL must reference a file via the 'blob' or 'raw' view (e.g. https://github.com/<org>/<repo>/blob/<ref>/<path>')."
+            )
+
+        remainder = segments[3:]
+        return self._download_github_repo_content(owner, repo, remainder, original_url)
+
+    def _download_github_from_segments(self, parsed: ParseResult, original_url: str) -> str:
+        """Fallback helper to download a file given a raw.githubusercontent.com URL."""
+
+        segments = [segment for segment in parsed.path.lstrip("/").split("/") if segment]
+        if len(segments) < 4:
+            raise RuntimeError(
+                f"GitHub raw URL '{original_url}' must include owner, repo, ref, and file path."
+            )
+
+        owner, repo = segments[0], segments[1]
+        remainder = segments[2:]
+        return self._download_github_repo_content(owner, repo, remainder, original_url)
+
+    def _download_github_repo_content(
+        self, owner: str, repo: str, remainder: List[str], original_url: str
+    ) -> str:
+        """Iterate potential ref/path splits and download content via the GitHub API."""
+
+        if len(remainder) < 2:
+            raise RuntimeError(
+                f"GitHub URL '{original_url}' must include both a ref and file path."
+            )
+
+        last_not_found: Optional[HTTPError] = None
+        for split in range(1, len(remainder)):
+            ref = "/".join(remainder[:split])
+            file_path = "/".join(remainder[split:])
+
+            try:
+                return self._download_github_repo_api(owner, repo, ref, file_path, original_url)
+            except HTTPError as exc:  # pragma: no cover - GitHub API failures
+                if exc.code == 404:
+                    last_not_found = exc
+                    continue
+                raise RuntimeError(f"Failed to download '{original_url}' via GitHub API: {exc}") from exc
+
+        if last_not_found is not None:
+            raise RuntimeError(f"GitHub API reported 404 for '{original_url}'") from last_not_found
+
+        raise RuntimeError(f"GitHub URL '{original_url}' does not contain a downloadable file path")
+
+    def _download_github_repo_api(
+        self, owner: str, repo: str, ref: str, file_path: str, original_url: str
+    ) -> str:
+        """Perform the authenticated GitHub API request for repository file content."""
+
+        token = self._get_github_token()
+
+        encoded_path = "/".join(quote(part, safe="") for part in file_path.split("/"))
+        encoded_ref = quote(ref, safe="")
+        api_url = (
+            f"https://api.github.com/repos/{owner}/{repo}/contents/{encoded_path}?ref={encoded_ref}"
+        )
+
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3.raw",
+        }
+
+        try:
+            return self._download_plain(api_url, headers)
+        except HTTPError:
+            raise
+        except URLError as exc:  # pragma: no cover - network/IO error path
+            raise RuntimeError(f"Failed to download '{original_url}' via GitHub API: {exc}") from exc
+
+    def _get_github_token(self) -> str:
+        """Return a GitHub token retrieved via the GitHub CLI."""
+
+        if self._github_token is not None:
+            return self._github_token
+
+        try:
+            result = subprocess.run(
+                ["gh", "auth", "token"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "GitHub CLI ('gh') is required to download private GitHub content."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(
+                "Unable to obtain GitHub token via 'gh auth token'. Ensure you are logged in."
+            ) from exc
+
+        token = result.stdout.strip()
+        if not token:
+            raise RuntimeError("Received empty token from 'gh auth token'.")
+
+        self._github_token = token
+        return token
 
     def build_catalog(self, config: CatalogBuildConfig) -> None:
         """Construct a catalog JSON document based on the provided configuration."""

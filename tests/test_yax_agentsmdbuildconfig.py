@@ -3,7 +3,7 @@ from textwrap import dedent
 
 import pytest
 
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 from yaxai.yax import (
     AgentsmdBuildConfig,
@@ -189,7 +189,8 @@ def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
         "https://example.com/second.md": "second content",
     }
 
-    def fake_urlopen(url):
+    def fake_urlopen(request):
+        url = getattr(request, "full_url", request)
         class _Response:
             def __init__(self, data: str):
                 self._data = data.encode("utf-8")
@@ -285,7 +286,7 @@ def test_build_agentsmd_errors_when_glob_matches_nothing(tmp_path, monkeypatch):
 def test_build_agentsmd_wraps_url_errors(tmp_path, monkeypatch):
     failing_url = "https://example.com/failure.md"
 
-    def fake_urlopen(url):
+    def fake_urlopen(request):  # noqa: ARG001 - signature matches urlopen
         raise URLError("boom")
 
     monkeypatch.setattr("yaxai.yax.urlopen", fake_urlopen)
@@ -296,3 +297,84 @@ def test_build_agentsmd_wraps_url_errors(tmp_path, monkeypatch):
         Yax().build_agentsmd(config)
 
     assert failing_url in str(exc.value)
+
+
+def test_build_agentsmd_falls_back_to_github_api_for_missing_raw(tmp_path, monkeypatch):
+    raw_url = "https://raw.githubusercontent.com/acme/widgets/main/docs/AGENT.md"
+    api_url = (
+        "https://api.github.com/repos/acme/widgets/contents/docs/AGENT.md?ref=main"
+    )
+
+    def fake_urlopen(request):  # noqa: ARG001 - signature matches urlopen
+        url = getattr(request, "full_url", request)
+        if url == raw_url:
+            raise HTTPError(url, 404, "Not Found", hdrs=None, fp=None)
+        if url == api_url:
+            raw_headers = getattr(request, "headers", {})
+            headers = {key.lower(): value for key, value in raw_headers.items()}
+            assert headers.get("authorization") == "token token-123"
+            assert headers.get("accept") == "application/vnd.github.v3.raw"
+            assert headers.get("user-agent") == Yax.USER_AGENT
+
+            class _Response:
+                def read(self):
+                    return b"private content"
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+            return _Response()
+        raise AssertionError(f"Unexpected URL requested: {url}")
+
+    monkeypatch.setattr("yaxai.yax.urlopen", fake_urlopen)
+    monkeypatch.setattr(Yax, "_get_github_token", lambda self: "token-123")
+
+    output_path = tmp_path / "AGENTS.md"
+    config = AgentsmdBuildConfig(urls=[raw_url], output=str(output_path))
+
+    Yax().build_agentsmd(config)
+
+    assert output_path.read_text(encoding="utf-8") == "private content"
+
+
+def test_build_agentsmd_uses_github_api_for_ui_url(tmp_path, monkeypatch):
+    github_url = "https://github.com/acme/widgets/blob/main/docs/AGENT.md"
+    api_url = (
+        "https://api.github.com/repos/acme/widgets/contents/docs/AGENT.md?ref=main"
+    )
+
+    def fake_urlopen(request):  # noqa: ARG001 - signature matches urlopen
+        url = getattr(request, "full_url", request)
+        if url == api_url:
+            raw_headers = getattr(request, "headers", {})
+            headers = {key.lower(): value for key, value in raw_headers.items()}
+            assert headers.get("authorization") == "token token-123"
+            assert headers.get("accept") == "application/vnd.github.v3.raw"
+            assert headers.get("user-agent") == Yax.USER_AGENT
+
+            class _Response:
+                def read(self):
+                    return b"ui content"
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+            return _Response()
+
+        raise AssertionError(f"Unexpected URL requested: {url}")
+
+    monkeypatch.setattr("yaxai.yax.urlopen", fake_urlopen)
+    monkeypatch.setattr(Yax, "_get_github_token", lambda self: "token-123")
+
+    output_path = tmp_path / "AGENTS.md"
+    config = AgentsmdBuildConfig(urls=[github_url], output=str(output_path))
+
+    Yax().build_agentsmd(config)
+
+    assert output_path.read_text(encoding="utf-8") == "ui content"
