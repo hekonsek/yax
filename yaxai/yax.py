@@ -105,17 +105,11 @@ DEFAULT_CATALOG_OUTPUT = "yax-catalog.json"
 @dataclass
 class CatalogSource:
     url: str
-    name: Optional[str] = None
 
     def __post_init__(self) -> None:
         self.url = self.url.strip()
         if not self.url:
             raise ValueError("Catalog source url must be a non-empty string")
-
-        if self.name is not None:
-            self.name = self.name.strip()
-            if not self.name:
-                raise ValueError("Catalog source name must be a non-empty string when provided")
 
 
 @dataclass
@@ -170,34 +164,17 @@ class CatalogBuildConfig:
                 if not isinstance(url_value, str) or not url_value.strip():
                     raise ValueError("Catalog source objects must include a non-empty 'url' field")
 
-                name_value: Optional[str] = None
+                if "name" in entry:
+                    raise ValueError(
+                        "Catalog source 'name' is no longer supported; define metadata in the referenced config"
+                    )
 
-                direct_name = entry.get("name")
-                if direct_name is not None:
-                    if not isinstance(direct_name, str):
-                        raise ValueError("Catalog source 'name' must be a string")
-                    stripped_direct_name = direct_name.strip()
-                    if not stripped_direct_name:
-                        raise ValueError("Catalog source 'name' must be a non-empty string when provided")
-                    name_value = stripped_direct_name
+                if "metadata" in entry:
+                    raise ValueError(
+                        "Catalog source 'metadata' is no longer supported; define metadata in the referenced config"
+                    )
 
-                if name_value is None and "metadata" in entry:
-                    metadata_raw = entry.get("metadata")
-                    if metadata_raw is not None:
-                        if not isinstance(metadata_raw, dict):
-                            raise ValueError("Catalog source 'metadata' must be a mapping")
-                        meta_name = metadata_raw.get("name")
-                        if meta_name is not None:
-                            if not isinstance(meta_name, str):
-                                raise ValueError("Catalog source 'metadata.name' must be a string")
-                            stripped_meta_name = meta_name.strip()
-                            if not stripped_meta_name:
-                                raise ValueError(
-                                    "Catalog source 'metadata.name' must be a non-empty string when provided"
-                                )
-                            name_value = stripped_meta_name
-
-                sources.append(CatalogSource(url=url_value.strip(), name=name_value))
+                sources.append(CatalogSource(url=url_value.strip()))
                 continue
 
             raise ValueError("Catalog sources must be strings or objects with a 'url'")
@@ -523,7 +500,10 @@ class Yax:
                 CatalogOrganization(
                     name=config.organization,
                     collections=[
-                        CatalogCollection(url=source.url, name=source.name)
+                        CatalogCollection(
+                            url=source.url,
+                            name=self._discover_catalog_collection_name(source.url),
+                        )
                         for source in config.sources
                     ],
                 )
@@ -563,6 +543,100 @@ class Yax:
         output_path.write_text(content, encoding="utf-8")
 
         return output_path
+
+    def _discover_catalog_collection_name(self, source_url: str) -> Optional[str]:
+        """Load the referenced Yax config and extract the collection display name."""
+
+        config_text = self._read_catalog_source_text(source_url)
+        config_data = self._parse_catalog_source_yaml(config_text, source_url)
+
+        build_section = config_data.get("build")
+        if not isinstance(build_section, dict):
+            return None
+
+        agentsmd_section = build_section.get("agentsmd")
+        if not isinstance(agentsmd_section, dict):
+            return None
+
+        metadata = agentsmd_section.get("metadata")
+        if not isinstance(metadata, dict):
+            return None
+
+        raw_name = metadata.get("name")
+        if raw_name is None:
+            return None
+        if not isinstance(raw_name, str):
+            raise ValueError(
+                f"Catalog source '{source_url}' metadata 'name' must be a string"
+            )
+
+        stripped = raw_name.strip()
+        if not stripped:
+            raise ValueError(
+                f"Catalog source '{source_url}' metadata 'name' must be a non-empty string"
+            )
+
+        return stripped
+
+    def _parse_catalog_source_yaml(self, contents: str, source_url: str) -> Dict[str, Any]:
+        """Parse YAML contents from a catalog source and validate the structure."""
+
+        try:
+            data = yaml.safe_load(contents) or {}
+        except yaml.YAMLError as exc:  # pragma: no cover - yaml parser detail path
+            raise RuntimeError(
+                f"Failed to parse YAML from catalog source '{source_url}': {exc}"
+            ) from exc
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Catalog source '{source_url}' must contain a YAML mapping at the root"
+            )
+
+        return data
+
+    def _read_catalog_source_text(self, source_url: str) -> str:
+        """Retrieve the raw YAML contents for the provided catalog source URL."""
+
+        parsed = urlparse(source_url)
+        scheme = parsed.scheme.lower()
+
+        if scheme in {"http", "https"}:
+            return self._download_remote_source(source_url)
+
+        if scheme == "file":
+            path = self._file_uri_to_path(parsed)
+            try:
+                return path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise RuntimeError(
+                    f"Failed to read catalog source '{source_url}': {exc}"
+                ) from exc
+
+        if not scheme:
+            path = Path(source_url).expanduser()
+            try:
+                return path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise RuntimeError(
+                    f"Failed to read catalog source '{source_url}': {exc}"
+                ) from exc
+
+        raise RuntimeError(
+            f"Unsupported catalog source URL scheme '{scheme}' for '{source_url}'"
+        )
+
+    @staticmethod
+    def _file_uri_to_path(parsed: ParseResult) -> Path:
+        """Convert a file:// URI parse result into a filesystem path."""
+
+        path = unquote(parsed.path or "")
+        if parsed.netloc:
+            if path.startswith("/"):
+                return Path(f"/{parsed.netloc}{path}")
+            return Path(f"/{parsed.netloc}/{path}")
+
+        return Path(path)
 
     def _read_local_sources(self, file_url: str) -> List[str]:
         """Read and return content fragments for file-based agents sources."""

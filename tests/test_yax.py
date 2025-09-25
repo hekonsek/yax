@@ -57,11 +57,27 @@ def test_open_catalog_build_config_with_sources_and_output(tmp_path):
         "https://example.com/first.yml",
         "https://example.com/second.yml",
     ]
-    assert all(source.name is None for source in config.sources)
     assert config.output == "generated/catalog.json"
 
 
-def test_open_catalog_build_config_allows_metadata(tmp_path):
+def test_open_catalog_build_config_rejects_name(tmp_path):
+    config_file = _write_config(
+        tmp_path,
+        """
+        build:
+          catalog:
+            organization: example
+            from:
+              - url: https://example.com/catalog.yml
+                name: Example Catalog
+        """,
+    )
+
+    with pytest.raises(ValueError, match=r"'name' is no longer supported"):
+        CatalogBuildConfig.open_catalog_build_config(str(config_file))
+
+
+def test_open_catalog_build_config_rejects_metadata(tmp_path):
     config_file = _write_config(
         tmp_path,
         """
@@ -75,33 +91,8 @@ def test_open_catalog_build_config_allows_metadata(tmp_path):
         """,
     )
 
-    config = CatalogBuildConfig.open_catalog_build_config(str(config_file))
-
-    assert len(config.sources) == 1
-    source = config.sources[0]
-    assert source.url == "https://example.com/catalog.yml"
-    assert source.name == "Example Catalog"
-
-
-def test_open_catalog_build_config_allows_direct_name(tmp_path):
-    config_file = _write_config(
-        tmp_path,
-        """
-        build:
-          catalog:
-            organization: example
-            from:
-              - url: https://example.com/catalog.yml
-                name: Example Catalog
-        """,
-    )
-
-    config = CatalogBuildConfig.open_catalog_build_config(str(config_file))
-
-    assert len(config.sources) == 1
-    source = config.sources[0]
-    assert source.url == "https://example.com/catalog.yml"
-    assert source.name == "Example Catalog"
+    with pytest.raises(ValueError, match=r"'metadata' is no longer supported"):
+        CatalogBuildConfig.open_catalog_build_config(str(config_file))
 
 
 def test_open_catalog_build_config_requires_org(tmp_path):
@@ -150,9 +141,11 @@ def test_open_catalog_build_config_requires_string_sources(tmp_path):
 
 def test_build_catalog_writes_expected_json(tmp_path):
     output_path = tmp_path / "dir" / "catalog.json"
+    source_path = tmp_path / "source.yml"
+    source_path.write_text("", encoding="utf-8")
     config = CatalogBuildConfig(
         organization="example",
-        sources=["https://example.com/catalog.yml"],
+        sources=[str(source_path)],
         output=str(output_path),
     )
 
@@ -163,7 +156,7 @@ def test_build_catalog_writes_expected_json(tmp_path):
     assert result == {
         "organizations": [
             {
-                "collections": [{"url": "https://example.com/catalog.yml"}],
+                "collections": [{"url": str(source_path)}],
                 "name": "example",
             }
         ]
@@ -172,9 +165,21 @@ def test_build_catalog_writes_expected_json(tmp_path):
 
 def test_build_catalog_includes_metadata(tmp_path):
     output_path = tmp_path / "dir" / "catalog.json"
+    source_path = tmp_path / "source.yml"
+    source_path.write_text(
+        dedent(
+            """
+            build:
+              agentsmd:
+                metadata:
+                  name: Example Catalog
+            """
+        ),
+        encoding="utf-8",
+    )
     config = CatalogBuildConfig(
         organization="example",
-        sources=[CatalogSource(url="https://example.com/catalog.yml", name="Example Catalog")],
+        sources=[CatalogSource(url=str(source_path))],
         output=str(output_path),
     )
 
@@ -183,7 +188,7 @@ def test_build_catalog_includes_metadata(tmp_path):
     result = json.loads(output_path.read_text(encoding="utf-8"))
 
     expected_collection = {
-        "url": "https://example.com/catalog.yml",
+        "url": str(source_path),
         "name": "Example Catalog",
     }
 

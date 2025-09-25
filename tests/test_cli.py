@@ -179,6 +179,17 @@ def test_catalog_build_missing_config():
 
 def test_catalog_build_creates_json():
     with runner.isolated_filesystem():
+        Path("source.yml").write_text(
+            dedent(
+                """
+                build:
+                  agentsmd:
+                    metadata:
+                      name: Example Catalog
+                """
+            ),
+            encoding="utf-8",
+        )
         Path(DEFAULT_CATALOG_CONFIG_FILENAME).write_text(
             dedent(
                 """
@@ -186,7 +197,7 @@ def test_catalog_build_creates_json():
                   catalog:
                     organization: example
                     from:
-                      - https://example.com/catalog.yml
+                      - source.yml
                 """
             ),
             encoding="utf-8",
