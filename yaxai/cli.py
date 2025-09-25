@@ -62,7 +62,7 @@ def _build_agentsmd(config: Path, output: Optional[Path]) -> None:
         typer.echo(f"Error building agentsmd: {exc}")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Generated agents markdown: {_green(build_config.output)}.")
+    typer.echo(f"Generated agents markdown: {_green(build_config.output)}")
 
 
 def _load_catalog_config(config_path: Path) -> CatalogBuildConfig:
