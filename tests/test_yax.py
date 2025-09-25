@@ -4,7 +4,13 @@ from textwrap import dedent
 
 import pytest
 
-from yaxai.yax import CatalogBuildConfig, DEFAULT_CATALOG_OUTPUT, Yax
+from yaxai.yax import (
+    AgentsmdBuildConfig,
+    CatalogBuildConfig,
+    CatalogSource,
+    DEFAULT_CATALOG_OUTPUT,
+    Yax,
+)
 
 
 def _write_config(tmp_path: Path, contents: str) -> Path:
@@ -47,11 +53,55 @@ def test_open_catalog_build_config_with_sources_and_output(tmp_path):
     config = CatalogBuildConfig.open_catalog_build_config(str(config_file))
 
     assert config.organization == "example"
-    assert config.sources == [
+    assert [source.url for source in config.sources] == [
         "https://example.com/first.yml",
         "https://example.com/second.yml",
     ]
+    assert all(source.name is None for source in config.sources)
     assert config.output == "generated/catalog.json"
+
+
+def test_open_catalog_build_config_allows_metadata(tmp_path):
+    config_file = _write_config(
+        tmp_path,
+        """
+        build:
+          catalog:
+            organization: example
+            from:
+              - url: https://example.com/catalog.yml
+                metadata:
+                  name: Example Catalog
+        """,
+    )
+
+    config = CatalogBuildConfig.open_catalog_build_config(str(config_file))
+
+    assert len(config.sources) == 1
+    source = config.sources[0]
+    assert source.url == "https://example.com/catalog.yml"
+    assert source.name == "Example Catalog"
+
+
+def test_open_catalog_build_config_allows_direct_name(tmp_path):
+    config_file = _write_config(
+        tmp_path,
+        """
+        build:
+          catalog:
+            organization: example
+            from:
+              - url: https://example.com/catalog.yml
+                name: Example Catalog
+        """,
+    )
+
+    config = CatalogBuildConfig.open_catalog_build_config(str(config_file))
+
+    assert len(config.sources) == 1
+    source = config.sources[0]
+    assert source.url == "https://example.com/catalog.yml"
+    assert source.name == "Example Catalog"
 
 
 def test_open_catalog_build_config_requires_org(tmp_path):
@@ -120,6 +170,33 @@ def test_build_catalog_writes_expected_json(tmp_path):
     }
 
 
+def test_build_catalog_includes_metadata(tmp_path):
+    output_path = tmp_path / "dir" / "catalog.json"
+    config = CatalogBuildConfig(
+        organization="example",
+        sources=[CatalogSource(url="https://example.com/catalog.yml", name="Example Catalog")],
+        output=str(output_path),
+    )
+
+    Yax().build_catalog(config)
+
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+
+    expected_collection = {
+        "url": "https://example.com/catalog.yml",
+        "name": "Example Catalog",
+    }
+
+    assert result == {
+        "organizations": [
+            {
+                "collections": [expected_collection],
+                "name": "example",
+            }
+        ]
+    }
+
+
 def test_export_catalog_writes_markdown(tmp_path):
     source = tmp_path / "catalog.json"
     catalog_data = {
@@ -142,6 +219,73 @@ def test_export_catalog_writes_markdown(tmp_path):
         "# Catalog\n\n## Example Org\n\n- https://example.com/one.yml\n"
         "- https://example.com/two.yml\n"
     )
+
+
+def test_export_catalog_markdown_uses_metadata_name(tmp_path):
+    source = tmp_path / "catalog.json"
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example Org",
+                "collections": [
+                    {"url": "https://example.com/one.yml", "name": "Example Catalog"}
+                ],
+            }
+        ]
+    }
+    source.write_text(json.dumps(catalog_data), encoding="utf-8")
+
+    output_path = Yax().export_catalog(source, "markdown")
+
+    assert output_path.read_text(encoding="utf-8") == (
+        "# Catalog\n\n## Example Org\n\n- [Example Catalog](https://example.com/one.yml)\n"
+    )
+
+
+def test_export_catalog_markdown_supports_legacy_metadata(tmp_path):
+    source = tmp_path / "catalog.json"
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example Org",
+                "collections": [
+                    {
+                        "url": "https://example.com/one.yml",
+                        "metadata": {"name": "Legacy Catalog"},
+                    }
+                ],
+            }
+        ]
+    }
+    source.write_text(json.dumps(catalog_data), encoding="utf-8")
+
+    output_path = Yax().export_catalog(source, "markdown")
+
+    assert output_path.read_text(encoding="utf-8") == (
+        "# Catalog\n\n## Example Org\n\n- [Legacy Catalog](https://example.com/one.yml)\n"
+    )
+
+
+def test_agentsmd_build_config_parses_metadata(tmp_path):
+    config_path = tmp_path / "yax.yml"
+    config_path.write_text(
+        dedent(
+            """
+            build:
+              agentsmd:
+                from:
+                  - https://example.com/agents.md
+                metadata:
+                  name: Example Project
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    config = AgentsmdBuildConfig.parse_yml(config_path)
+
+    assert config.urls == ["https://example.com/agents.md"]
+    assert config.name == "Example Project"
 
 
 def test_export_catalog_rejects_invalid_json(tmp_path):

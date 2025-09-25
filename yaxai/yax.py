@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from glob import glob
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import ParseResult, quote, unquote, urlparse
 from urllib.request import Request, urlopen
@@ -21,6 +21,7 @@ DEFAULT_AGENTSMD_CONFIG_FILENAME = "yax.yml"
 class AgentsmdBuildConfig:
     urls: Optional[List[str]] = None
     output: str = DEFAULT_AGENTSMD_OUTPUT
+    name: Optional[str] = None
 
     @staticmethod
     def resolve_config_path(
@@ -80,17 +81,61 @@ class AgentsmdBuildConfig:
             else:
                 raise ValueError("Source URLs in 'build.agentsmd.from' must be non-empty strings")
 
-        return cls(urls=normalized_urls, output=output)
+        name_value: Optional[str] = None
+        metadata_raw = agentsmd_section.get("metadata")
+        if metadata_raw is not None:
+            if not isinstance(metadata_raw, dict):
+                raise ValueError("Expected 'metadata' to be a mapping in config file")
+
+            raw_name = metadata_raw.get("name")
+            if raw_name is not None:
+                if not isinstance(raw_name, str):
+                    raise ValueError("Expected 'metadata.name' to be a string")
+                stripped_name = raw_name.strip()
+                if not stripped_name:
+                    raise ValueError("'metadata.name' must be a non-empty string when provided")
+                name_value = stripped_name
+
+        return cls(urls=normalized_urls, output=output, name=name_value)
 
 
 DEFAULT_CATALOG_OUTPUT = "yax-catalog.json"
 
 
 @dataclass
+class CatalogSource:
+    url: str
+    name: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        self.url = self.url.strip()
+        if not self.url:
+            raise ValueError("Catalog source url must be a non-empty string")
+
+        if self.name is not None:
+            self.name = self.name.strip()
+            if not self.name:
+                raise ValueError("Catalog source name must be a non-empty string when provided")
+
+
+@dataclass
 class CatalogBuildConfig:
     organization: str
-    sources: List[str] = field(default_factory=list)
+    sources: List[CatalogSource] = field(default_factory=list)
     output: str = DEFAULT_CATALOG_OUTPUT
+
+    def __post_init__(self) -> None:
+        normalized_sources: List[CatalogSource] = []
+        for entry in self.sources:
+            if isinstance(entry, CatalogSource):
+                source = entry
+            elif isinstance(entry, str):
+                source = CatalogSource(url=entry)
+            else:
+                raise TypeError("Catalog sources must be strings or CatalogSource instances")
+            normalized_sources.append(source)
+
+        self.sources = normalized_sources
 
     @classmethod
     def open_catalog_build_config(cls, config_file_path: str | Path) -> "CatalogBuildConfig":
@@ -110,15 +155,52 @@ class CatalogBuildConfig:
         if raw_sources is None:
             raw_sources = []
         if not isinstance(raw_sources, list):
-            raise ValueError("Expected 'from' to be a list of strings in config file")
+            raise ValueError("Expected 'from' to be a list in config file")
 
-        sources: List[str] = []
-        for source in raw_sources:
-            if not isinstance(source, str):
-                raise ValueError("Expected every entry in 'from' to be a string")
-            stripped = source.strip()
-            if stripped:
-                sources.append(stripped)
+        sources: List[CatalogSource] = []
+        for entry in raw_sources:
+            if isinstance(entry, str):
+                stripped = entry.strip()
+                if stripped:
+                    sources.append(CatalogSource(url=stripped))
+                continue
+
+            if isinstance(entry, dict):
+                url_value = entry.get("url")
+                if not isinstance(url_value, str) or not url_value.strip():
+                    raise ValueError("Catalog source objects must include a non-empty 'url' field")
+
+                name_value: Optional[str] = None
+
+                direct_name = entry.get("name")
+                if direct_name is not None:
+                    if not isinstance(direct_name, str):
+                        raise ValueError("Catalog source 'name' must be a string")
+                    stripped_direct_name = direct_name.strip()
+                    if not stripped_direct_name:
+                        raise ValueError("Catalog source 'name' must be a non-empty string when provided")
+                    name_value = stripped_direct_name
+
+                if name_value is None and "metadata" in entry:
+                    metadata_raw = entry.get("metadata")
+                    if metadata_raw is not None:
+                        if not isinstance(metadata_raw, dict):
+                            raise ValueError("Catalog source 'metadata' must be a mapping")
+                        meta_name = metadata_raw.get("name")
+                        if meta_name is not None:
+                            if not isinstance(meta_name, str):
+                                raise ValueError("Catalog source 'metadata.name' must be a string")
+                            stripped_meta_name = meta_name.strip()
+                            if not stripped_meta_name:
+                                raise ValueError(
+                                    "Catalog source 'metadata.name' must be a non-empty string when provided"
+                                )
+                            name_value = stripped_meta_name
+
+                sources.append(CatalogSource(url=url_value.strip(), name=name_value))
+                continue
+
+            raise ValueError("Catalog sources must be strings or objects with a 'url'")
 
         output = catalog_section.get("output", DEFAULT_CATALOG_OUTPUT)
         if output is None:
@@ -132,17 +214,59 @@ class CatalogBuildConfig:
 @dataclass
 class CatalogCollection:
     url: str
+    name: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        self.url = self.url.strip()
+        if self.name is not None:
+            self.name = self.name.strip()
+            if not self.name:
+                raise ValueError("Catalog collection name must be a non-empty string when provided")
 
     @classmethod
     def from_mapping(cls, data: Any) -> "CatalogCollection":
         if not isinstance(data, dict):
             raise ValueError("Expected collection entry to be an object")
 
-        url = data.get("url", "")
-        if isinstance(url, str):
-            return cls(url=url.strip())
+        url_value = data.get("url", "")
+        if not isinstance(url_value, str):
+            raise ValueError("Expected collection 'url' to be a string")
 
-        raise ValueError("Expected collection 'url' to be a string")
+        name_value: Optional[str] = None
+
+        if "name" in data:
+            direct_name = data.get("name")
+            if direct_name is not None:
+                if not isinstance(direct_name, str):
+                    raise ValueError("Expected collection 'name' to be a string")
+                stripped_direct_name = direct_name.strip()
+                if not stripped_direct_name:
+                    raise ValueError("Collection 'name' must be a non-empty string when provided")
+                name_value = stripped_direct_name
+
+        if name_value is None and "metadata" in data:
+            metadata_raw = data.get("metadata")
+            if metadata_raw is not None:
+                if not isinstance(metadata_raw, dict):
+                    raise ValueError("Expected collection 'metadata' to be a mapping")
+                meta_name = metadata_raw.get("name")
+                if meta_name is not None:
+                    if not isinstance(meta_name, str):
+                        raise ValueError("Expected collection 'metadata.name' to be a string")
+                    stripped_meta_name = meta_name.strip()
+                    if not stripped_meta_name:
+                        raise ValueError(
+                            "Collection 'metadata.name' must be a non-empty string when provided"
+                        )
+                    name_value = stripped_meta_name
+
+        return cls(url=url_value.strip(), name=name_value)
+
+    def to_dict(self) -> Dict[str, Any]:
+        data: Dict[str, Any] = {"url": self.url}
+        if self.name:
+            data["name"] = self.name
+        return data
 
 
 @dataclass
@@ -167,6 +291,12 @@ class CatalogOrganization:
 
         return cls(name=name_value.strip(), collections=collections)
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "collections": [collection.to_dict() for collection in self.collections],
+        }
+
 
 @dataclass
 class Catalog:
@@ -184,6 +314,11 @@ class Catalog:
         organizations = [CatalogOrganization.from_mapping(entry) for entry in organizations_raw]
 
         return cls(organizations=organizations)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "organizations": [org.to_dict() for org in self.organizations],
+        }
 
 
 class Yax:
@@ -387,7 +522,10 @@ class Yax:
             organizations=[
                 CatalogOrganization(
                     name=config.organization,
-                    collections=[CatalogCollection(url=source) for source in config.sources],
+                    collections=[
+                        CatalogCollection(url=source.url, name=source.name)
+                        for source in config.sources
+                    ],
                 )
             ]
         )
@@ -396,7 +534,7 @@ class Yax:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         output_path.write_text(
-            json.dumps(asdict(catalog), indent=2, sort_keys=True),
+            json.dumps(catalog.to_dict(), indent=2, sort_keys=True),
             encoding="utf-8",
         )
 
@@ -483,8 +621,14 @@ class Yax:
 
             for collection in organization.collections:
                 url = collection.url.strip()
-                if url:
+                display_name = collection.name
+
+                if display_name and url:
+                    lines.append(f"- [{display_name}]({url})")
+                elif url:
                     lines.append(f"- {url}")
+                elif display_name:
+                    lines.append(f"- {display_name}")
                 else:
                     lines.append("- (missing url)")
 
