@@ -162,6 +162,10 @@ def test_download_raises_when_not_visible(monkeypatch: pytest.MonkeyPatch) -> No
     with pytest.raises(RuntimeError):
         instance.download()
 
+def test_download_via_api():
+    ghfile = GitHubFile.parse("https://github.com/hekonsek/yax/blob/main/README.md")
+    assert "# yax: You Are eXpert" in ghfile._download_via_api()
+
 
 def test_parse_normalizes_http_to_https() -> None:
     instance = GitHubFile.parse("http://github.com/acme/widgets/blob/main/README.md")
