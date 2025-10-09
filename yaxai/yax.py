@@ -331,10 +331,12 @@ class Yax:
         """Retrieve remote source content with GitHub authentication support."""
 
         ghfile = GitHubFile.parse(url)
-        url = ghfile.raw()
+        if ghfile.is_visible():
+            return ghfile.download()
 
+        url = ghfile.raw()
         parsed = urlparse(ghfile.raw())
-        return self._download_github_raw_with_fallback(parsed, url)
+        return self._download_github_from_segments(parsed, url)
 
 
     def _download_plain(self, url: str, extra_headers: Optional[dict[str, str]] = None) -> str:
@@ -354,18 +356,6 @@ class Yax:
         headers: dict[str, str] = {"User-Agent": self.USER_AGENT}
         headers.update(extra_headers)
         return headers
-
-    def _download_github_raw_with_fallback(self, parsed: ParseResult, original_url: str) -> str:
-        """Attempt raw download, falling back to the API for private content."""
-
-        try:
-            return self._download_plain(original_url)
-        except HTTPError as exc:
-            if exc.code in {401, 403, 404}:
-                return self._download_github_from_segments(parsed, original_url)
-            raise RuntimeError(f"Failed to download '{original_url}': {exc}") from exc
-        except URLError as exc:  # pragma: no cover - network/IO error path
-            raise RuntimeError(f"Failed to download '{original_url}': {exc}") from exc
 
     def _download_github_ui_url(self, parsed: ParseResult, original_url: str) -> str:
         """Download a GitHub UI URL via the REST API using authentication."""

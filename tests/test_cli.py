@@ -20,12 +20,7 @@ def test_agentsmd_build_missing_config():
     assert "Configuration file not found" in result.stdout
 
 
-def test_agentsmd_build_uses_parent_fallback_config(monkeypatch, stub_urlopen):
-    monkeypatch.setattr(
-        "yaxai.yax.urlopen",
-        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "from fallback"}),
-    )
-
+def test_agentsmd_build_uses_parent_fallback_config():
     with runner.isolated_filesystem():
         root_dir = Path.cwd()
         project_dir = root_dir / "fooproject"
@@ -38,7 +33,7 @@ def test_agentsmd_build_uses_parent_fallback_config(monkeypatch, stub_urlopen):
                 build:
                   agentsmd:
                     from:
-                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
+                      - https://github.com/hekonsek/yax/blob/main/README.md
                 """
             ),
             encoding="utf-8",
@@ -55,7 +50,7 @@ def test_agentsmd_build_uses_parent_fallback_config(monkeypatch, stub_urlopen):
 
         assert result.exit_code == 0
         assert output_path.exists()
-        assert output_path.read_text(encoding="utf-8") == "from fallback"
+        assert "# yax: You Are eXpert" in output_path.read_text(encoding="utf-8")
         assert f"Using fallback configuration file: {fallback_path}" in result.stdout
         assert "Generated agents markdown: " in result.stdout
 
@@ -84,12 +79,7 @@ def fixture_stub_urlopen():
     return _factory
 
 
-def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen):
-    monkeypatch.setattr(
-        "yaxai.yax.urlopen",
-        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "downloaded"}),
-    )
-
+def test_agentsmd_build_uses_config_and_builds_output():
     with runner.isolated_filesystem():
         Path(DEFAULT_CONFIG_FILENAME).write_text(
             dedent(
@@ -97,7 +87,7 @@ def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen)
                 build:
                   agentsmd:
                     from:
-                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
+                      - https://github.com/hekonsek/yax/blob/main/README.md
                 """
             ),
             encoding="utf-8",
@@ -109,15 +99,10 @@ def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen)
 
         assert result.exit_code == 0
         assert "Generated agents markdown: " in result.stdout
-        assert output_path.read_text(encoding="utf-8") == "downloaded"
+        assert "# yax: You Are eXpert" in output_path.read_text(encoding="utf-8")
 
 
-def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
-    monkeypatch.setattr(
-        "yaxai.yax.urlopen",
-        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "override output"}),
-    )
-
+def test_agentsmd_build_honors_output_override():
     with runner.isolated_filesystem():
         Path(DEFAULT_CONFIG_FILENAME).write_text(
             dedent(
@@ -125,7 +110,7 @@ def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
                 build:
                   agentsmd:
                     from:
-                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
+                      - https://github.com/hekonsek/yax/blob/main/README.md
                 """
             ),
             encoding="utf-8",
@@ -137,16 +122,11 @@ def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
 
         assert result.exit_code == 0
         assert output_path.exists()
-        assert output_path.read_text(encoding="utf-8") == "override output"
+        assert "# yax: You Are eXpert" in output_path.read_text(encoding="utf-8")
         assert "Generated agents markdown: " in result.stdout
 
 
-def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
-    monkeypatch.setattr(
-        "yaxai.yax.urlopen",
-        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "alias output"}),
-    )
-
+def test_root_build_alias_runs_agentsmd_workflow():
     with runner.isolated_filesystem():
         Path(DEFAULT_CONFIG_FILENAME).write_text(
             dedent(
@@ -154,7 +134,7 @@ def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
                 build:
                   agentsmd:
                     from:
-                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
+                      - https://github.com/hekonsek/yax/blob/main/README.md
                 """
             ),
             encoding="utf-8",
@@ -165,7 +145,7 @@ def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
         output_path = Path("AGENTS.md")
 
         assert result.exit_code == 0
-        assert output_path.read_text(encoding="utf-8") == "alias output"
+        assert "# yax: You Are eXpert" in output_path.read_text(encoding="utf-8")
         assert "Generated agents markdown: " in result.stdout
 
 

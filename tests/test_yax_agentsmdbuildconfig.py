@@ -184,37 +184,14 @@ def test_parse_yml_rejects_blank_urls(tmp_path):
 
 
 def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
-    url_contents = {
-        "https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/first.md": "first content",
-        "https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/second.md": "second content",
-    }
-
-    def fake_urlopen(request):
-        url = getattr(request, "full_url", request)
-        class _Response:
-            def __init__(self, data: str):
-                self._data = data.encode("utf-8")
-
-            def read(self):
-                return self._data
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        return _Response(url_contents[url])
-
-    monkeypatch.setattr("yaxai.yax.urlopen", fake_urlopen)
-
     output_path = tmp_path / "generated" / "AGENTS.md"
-    config = AgentsmdBuildConfig(urls=list(url_contents.keys()), output=str(output_path))
+    config = AgentsmdBuildConfig(urls=["https://github.com/hekonsek/yax/blob/main/README.md","https://github.com/hekonsek/yax/blob/main/README.md"], output=str(output_path))
 
     Yax().build_agentsmd(config)
 
     assert Path(config.output) == output_path
-    assert output_path.read_text(encoding="utf-8") == "first content\n\nsecond content"
+    content = output_path.read_text(encoding="utf-8")
+    assert content.count("# yax: You Are eXpert") == 2
 
 
 def test_build_agentsmd_supports_local_file_sources(tmp_path, monkeypatch):
