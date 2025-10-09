@@ -16,10 +16,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install pipx and Poetry
-        run: |
-          python -m pip install --upgrade pip pipx
-          python -m pipx install poetry --force
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        run: pipx install poetry
       - name: Install project
         run: poetry install
       - name: Run check-depz
