@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import base64
+import json
+import os
 import subprocess
+from dataclasses import dataclass
 from typing import Optional
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 from urllib.request import Request, urlopen
-import os
 
 
 class GitHubTokenFinder:
@@ -125,14 +127,77 @@ class GitHubFile:
         return status not in {401, 403, 404}
 
     def download(self) -> str:
-        if not self.is_visible():
-            raise RuntimeError(f"GitHub file '{self.url}' is not visible.")
+        if self.is_visible():
+            return self._download_raw()
 
-        raw_url = self.raw()
-        request = Request(raw_url)
+        return self._download_via_api()
+
+    def _download_raw(self) -> str:
+        request = Request(self.raw())
 
         try:
             with urlopen(request) as response:
                 return response.read().decode("utf-8")
         except (HTTPError, URLError) as error:
             raise RuntimeError(f"Failed to download '{self.url}': {error}") from error
+
+    def _download_via_api(self) -> str:
+        owner, repository, ref, file_segments = self._extract_components()
+        encoded_path = "/".join(quote(segment, safe="") for segment in file_segments)
+        encoded_ref = quote(ref, safe="")
+        api_url = (
+            f"https://api.github.com/repos/"
+            f"{owner}/{repository}/contents/{encoded_path}?ref={encoded_ref}"
+        )
+
+        headers = {"Accept": "application/vnd.github.v3+json"}
+        token = GitHubTokenFinder().find()
+        if token:
+            headers["Authorization"] = f"token {token}"
+
+        request = Request(api_url, headers=headers)
+
+        try:
+            with urlopen(request) as response:
+                payload = response.read().decode("utf-8")
+        except (HTTPError, URLError) as error:
+            raise RuntimeError(
+                f"Failed to download '{self.url}' via GitHub API: {error}"
+            ) from error
+
+        try:
+            descriptor = json.loads(payload)
+        except json.JSONDecodeError as error:
+            raise RuntimeError(
+                f"Unexpected response format when downloading '{self.url}' via GitHub API"
+            ) from error
+
+        if descriptor.get("encoding") != "base64" or "content" not in descriptor:
+            raise RuntimeError(
+                f"Unexpected response when downloading '{self.url}' via GitHub API"
+            )
+
+        content = descriptor["content"].replace("\n", "")
+
+        try:
+            return base64.b64decode(content).decode("utf-8")
+        except (ValueError, UnicodeDecodeError) as error:
+            raise RuntimeError(
+                f"Failed to decode content for '{self.url}' from GitHub API response"
+            ) from error
+
+    def _extract_components(self) -> tuple[str, str, str, list[str]]:
+        parsed = urlparse(self.url)
+        segments = [segment for segment in parsed.path.split("/") if segment]
+
+        if len(segments) < 4:
+            raise RuntimeError(f"GitHub URL '{self.url}' is not a file reference.")
+
+        owner, repository, blob_keyword, ref, *file_segments = segments
+        if blob_keyword != "blob":
+            raise RuntimeError(f"GitHub URL '{self.url}' does not reference a blob.")
+
+        if not file_segments:
+            raise RuntimeError(f"GitHub URL '{self.url}' is missing the file path.")
+
+        return owner, repository, ref, file_segments
