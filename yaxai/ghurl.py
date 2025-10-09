@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
+from urllib.request import Request, urlopen
 
 
 _ALLOWED_SCHEMES = {"http", "https"}
@@ -77,3 +79,17 @@ class GitHubUrl:
                 parsed.fragment,
             )
         )
+
+    def is_visible(self, timeout: float = 10.0) -> bool:
+        raw_url = self.raw()
+        request = Request(raw_url, method="HEAD")
+
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                status = getattr(response, "status", response.getcode())
+        except HTTPError as error:
+            status = error.code
+        except URLError:
+            return False
+
+        return status not in {401, 403, 404}

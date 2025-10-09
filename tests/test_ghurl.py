@@ -1,4 +1,6 @@
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import urlopen
 
 import pytest
 
@@ -39,6 +41,34 @@ def test_raw_returns_raw_url_for_raw_input() -> None:
     instance = GitHubUrl.parse("https://raw.githubusercontent.com/acme/widgets/main/docs/AGENTS.md")
 
     assert instance.raw() == "https://raw.githubusercontent.com/acme/widgets/main/docs/AGENTS.md"
+
+
+def test_is_visible_returns_true_for_public_file() -> None:
+    instance = GitHubUrl.parse("https://github.com/hekonsek/yax/blob/main/README.md")
+
+    assert instance.is_visible()
+
+
+def test_is_visible_returns_false_for_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request, timeout: float = 10.0):
+        raise HTTPError(request.full_url, 404, "Not Found", hdrs=None, fp=None)
+
+    monkeypatch.setattr("yaxai.ghurl.urlopen", fake_urlopen)
+
+    instance = GitHubUrl.parse("https://github.com/acme/widgets/blob/main/README.md")
+
+    assert not instance.is_visible()
+
+
+def test_is_visible_returns_false_for_network_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request, timeout: float = 10.0):
+        raise URLError("boom")
+
+    monkeypatch.setattr("yaxai.ghurl.urlopen", fake_urlopen)
+
+    instance = GitHubUrl.parse("https://github.com/acme/widgets/blob/main/README.md")
+
+    assert not instance.is_visible()
 
 
 def test_parse_normalizes_http_to_https() -> None:
