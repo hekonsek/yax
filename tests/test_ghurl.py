@@ -71,6 +71,23 @@ def test_is_visible_returns_false_for_network_error(monkeypatch: pytest.MonkeyPa
     assert not instance.is_visible()
 
 
+def test_download_returns_content_when_visible() -> None:
+    instance = GitHubFile.parse("https://github.com/hekonsek/yax/blob/main/README.md")
+
+    content = instance.download()
+
+    assert "You Are eXpert" in content
+
+
+def test_download_raises_when_not_visible(monkeypatch: pytest.MonkeyPatch) -> None:
+    instance = GitHubFile.parse("https://github.com/acme/widgets/blob/main/README.md")
+
+    monkeypatch.setattr(GitHubFile, "is_visible", lambda self: False)
+
+    with pytest.raises(RuntimeError):
+        instance.download()
+
+
 def test_parse_normalizes_http_to_https() -> None:
     instance = GitHubFile.parse("http://github.com/acme/widgets/blob/main/README.md")
 

@@ -93,3 +93,16 @@ class GitHubFile:
             return False
 
         return status not in {401, 403, 404}
+
+    def download(self) -> str:
+        if not self.is_visible():
+            raise RuntimeError(f"GitHub file '{self.url}' is not visible.")
+
+        raw_url = self.raw()
+        request = Request(raw_url)
+
+        try:
+            with urlopen(request) as response:
+                return response.read().decode("utf-8")
+        except (HTTPError, URLError) as error:
+            raise RuntimeError(f"Failed to download '{self.url}': {error}") from error
