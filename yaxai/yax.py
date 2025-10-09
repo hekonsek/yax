@@ -330,21 +330,12 @@ class Yax:
     def _download_remote_source(self, url: str) -> str:
         """Retrieve remote source content with GitHub authentication support."""
 
-        GitHubUrl.parse(url)
-        parsed = urlparse(url)
+        ghurl = GitHubUrl.parse(url)
+        url = ghurl.raw()
 
-        host = parsed.netloc.lower()
+        parsed = urlparse(ghurl.raw())
+        return self._download_github_raw_with_fallback(parsed, url)
 
-        if host == "raw.githubusercontent.com":
-            return self._download_github_raw_with_fallback(parsed, url)
-
-        if host in {"github.com", "www.github.com"}:
-            return self._download_github_ui_url(parsed, url)
-
-        try:
-            return self._download_plain(url)
-        except URLError as exc:  # pragma: no cover - network/IO error path
-            raise RuntimeError(f"Failed to download '{url}': {exc}") from exc
 
     def _download_plain(self, url: str, extra_headers: Optional[dict[str, str]] = None) -> str:
         """Download text content from a URL using optional extra headers."""
