@@ -58,3 +58,22 @@ class GitHubUrl:
         )
 
         return cls(normalized_url)
+
+    def raw(self) -> str:
+        parsed = urlparse(self.url)
+
+        segments = [segment for segment in parsed.path.split("/") if segment]
+
+        owner, repository, _, ref, *file_segments = segments
+        raw_path = "/" + "/".join([owner, repository, ref, *file_segments])
+
+        return urlunparse(
+            (
+                "https",
+                "raw.githubusercontent.com",
+                raw_path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment,
+            )
+        )

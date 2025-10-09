@@ -29,6 +29,18 @@ def test_parse_accepts_github_raw_url() -> None:
     assert instance.url == "https://github.com/acme/widgets/blob/main/docs/AGENTS.md"
 
 
+def test_raw_returns_raw_url_for_ui_url() -> None:
+    instance = GitHubUrl.parse("https://github.com/acme/widgets/blob/main/README.md")
+
+    assert instance.raw() == "https://raw.githubusercontent.com/acme/widgets/main/README.md"
+
+
+def test_raw_returns_raw_url_for_raw_input() -> None:
+    instance = GitHubUrl.parse("https://raw.githubusercontent.com/acme/widgets/main/docs/AGENTS.md")
+
+    assert instance.raw() == "https://raw.githubusercontent.com/acme/widgets/main/docs/AGENTS.md"
+
+
 def test_parse_normalizes_http_to_https() -> None:
     instance = GitHubUrl.parse("http://github.com/acme/widgets/blob/main/README.md")
 
