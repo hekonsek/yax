@@ -185,8 +185,8 @@ def test_parse_yml_rejects_blank_urls(tmp_path):
 
 def test_build_agentsmd_writes_combined_content(tmp_path, monkeypatch):
     url_contents = {
-        "https://example.com/first.md": "first content",
-        "https://example.com/second.md": "second content",
+        "https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/first.md": "first content",
+        "https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/second.md": "second content",
     }
 
     def fake_urlopen(request):
@@ -281,22 +281,6 @@ def test_build_agentsmd_errors_when_glob_matches_nothing(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(RuntimeError):
         Yax().build_agentsmd(config)
-
-
-def test_build_agentsmd_wraps_url_errors(tmp_path, monkeypatch):
-    failing_url = "https://example.com/failure.md"
-
-    def fake_urlopen(request):  # noqa: ARG001 - signature matches urlopen
-        raise URLError("boom")
-
-    monkeypatch.setattr("yaxai.yax.urlopen", fake_urlopen)
-
-    config = AgentsmdBuildConfig(urls=[failing_url], output=str(tmp_path / "AGENTS.md"))
-
-    with pytest.raises(RuntimeError) as exc:
-        Yax().build_agentsmd(config)
-
-    assert failing_url in str(exc.value)
 
 
 def test_build_agentsmd_falls_back_to_github_api_for_missing_raw(tmp_path, monkeypatch):

@@ -12,6 +12,8 @@ from urllib.request import Request, urlopen
 
 import yaml
 
+from yaxai.ghurl import GitHubUrl
+
 
 DEFAULT_AGENTSMD_OUTPUT = "AGENTS.md"
 DEFAULT_AGENTSMD_CONFIG_FILENAME = "yax.yml"
@@ -328,10 +330,8 @@ class Yax:
     def _download_remote_source(self, url: str) -> str:
         """Retrieve remote source content with GitHub authentication support."""
 
+        GitHubUrl.parse(url)
         parsed = urlparse(url)
-        scheme = parsed.scheme.lower()
-        if scheme not in {"http", "https"}:
-            raise RuntimeError(f"Unsupported URL scheme for '{url}'")
 
         host = parsed.netloc.lower()
 

@@ -23,7 +23,7 @@ def test_agentsmd_build_missing_config():
 def test_agentsmd_build_uses_parent_fallback_config(monkeypatch, stub_urlopen):
     monkeypatch.setattr(
         "yaxai.yax.urlopen",
-        stub_urlopen({"https://example.com/fallback.md": "from fallback"}),
+        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "from fallback"}),
     )
 
     with runner.isolated_filesystem():
@@ -38,7 +38,7 @@ def test_agentsmd_build_uses_parent_fallback_config(monkeypatch, stub_urlopen):
                 build:
                   agentsmd:
                     from:
-                      - https://example.com/fallback.md
+                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
                 """
             ),
             encoding="utf-8",
@@ -87,7 +87,7 @@ def fixture_stub_urlopen():
 def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen):
     monkeypatch.setattr(
         "yaxai.yax.urlopen",
-        stub_urlopen({"https://example.com/one.md": "downloaded"}),
+        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "downloaded"}),
     )
 
     with runner.isolated_filesystem():
@@ -97,7 +97,7 @@ def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen)
                 build:
                   agentsmd:
                     from:
-                      - https://example.com/one.md
+                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
                 """
             ),
             encoding="utf-8",
@@ -115,7 +115,7 @@ def test_agentsmd_build_uses_config_and_builds_output(monkeypatch, stub_urlopen)
 def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
     monkeypatch.setattr(
         "yaxai.yax.urlopen",
-        stub_urlopen({"https://example.com/override.md": "override output"}),
+        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "override output"}),
     )
 
     with runner.isolated_filesystem():
@@ -125,7 +125,7 @@ def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
                 build:
                   agentsmd:
                     from:
-                      - https://example.com/override.md
+                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
                 """
             ),
             encoding="utf-8",
@@ -144,7 +144,7 @@ def test_agentsmd_build_honors_output_override(monkeypatch, stub_urlopen):
 def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
     monkeypatch.setattr(
         "yaxai.yax.urlopen",
-        stub_urlopen({"https://example.com/alias.md": "alias output"}),
+        stub_urlopen({"https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md": "alias output"}),
     )
 
     with runner.isolated_filesystem():
@@ -154,7 +154,7 @@ def test_root_build_alias_runs_agentsmd_workflow(monkeypatch, stub_urlopen):
                 build:
                   agentsmd:
                     from:
-                      - https://example.com/alias.md
+                      - https://raw.githubusercontent.com/hekonsek/adr-terraform/refs/heads/main/_agents.md
                 """
             ),
             encoding="utf-8",
