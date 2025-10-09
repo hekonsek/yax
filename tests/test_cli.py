@@ -177,7 +177,7 @@ def test_catalog_build_creates_json():
                   catalog:
                     organization: example
                     from:
-                      - source.yml
+                      - file:source.yml
                 """
             ),
             encoding="utf-8",

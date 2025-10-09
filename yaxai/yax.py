@@ -438,9 +438,6 @@ class Yax:
         parsed = urlparse(source_url)
         scheme = parsed.scheme.lower()
 
-        if scheme in {"http", "https"}:
-            return self._download_remote_source(source_url)
-
         if scheme == "file":
             path = self._file_uri_to_path(parsed)
             try:
@@ -449,19 +446,10 @@ class Yax:
                 raise RuntimeError(
                     f"Failed to read catalog source '{source_url}': {exc}"
                 ) from exc
+        else:
+            ghfile = GitHubFile.parse(source_url)
+            return ghfile.download()
 
-        if not scheme:
-            path = Path(source_url).expanduser()
-            try:
-                return path.read_text(encoding="utf-8")
-            except OSError as exc:
-                raise RuntimeError(
-                    f"Failed to read catalog source '{source_url}': {exc}"
-                ) from exc
-
-        raise RuntimeError(
-            f"Unsupported catalog source URL scheme '{scheme}' for '{source_url}'"
-        )
 
     @staticmethod
     def _file_uri_to_path(parsed: ParseResult) -> Path:

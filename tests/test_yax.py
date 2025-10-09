@@ -145,7 +145,7 @@ def test_build_catalog_writes_expected_json(tmp_path):
     source_path.write_text("", encoding="utf-8")
     config = CatalogBuildConfig(
         organization="example",
-        sources=[str(source_path)],
+        sources=["file:" + str(source_path)],
         output=str(output_path),
     )
 
@@ -156,7 +156,7 @@ def test_build_catalog_writes_expected_json(tmp_path):
     assert result == {
         "organizations": [
             {
-                "collections": [{"url": str(source_path)}],
+                "collections": [{"url": "file:" + str(source_path)}],
                 "name": "example",
             }
         ]
@@ -179,7 +179,7 @@ def test_build_catalog_includes_metadata(tmp_path):
     )
     config = CatalogBuildConfig(
         organization="example",
-        sources=[CatalogSource(url=str(source_path))],
+        sources=[CatalogSource(url="file:" + str(source_path))],
         output=str(output_path),
     )
 
@@ -188,7 +188,7 @@ def test_build_catalog_includes_metadata(tmp_path):
     result = json.loads(output_path.read_text(encoding="utf-8"))
 
     expected_collection = {
-        "url": str(source_path),
+        "url": "file:" + str(source_path),
         "name": "Example Catalog",
     }
 
