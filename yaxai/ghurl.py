@@ -11,13 +11,13 @@ _VALID_HOSTS = {"github.com", "raw.githubusercontent.com"}
 
 
 @dataclass(frozen=True)
-class GitHubUrl:
+class GitHubFile:
     url: str
 
     @classmethod
-    def parse(cls, value: str) -> GitHubUrl:
+    def parse(cls, value: str) -> GitHubFile:
         if not isinstance(value, str):
-            raise TypeError("GitHubUrl.parse expects a string argument")
+            raise TypeError("GitHubFile.parse expects a string argument")
 
         candidate = value.strip()
         if not candidate:

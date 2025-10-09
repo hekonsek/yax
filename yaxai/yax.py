@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 
 import yaml
 
-from yaxai.ghurl import GitHubUrl
+from yaxai.ghurl import GitHubFile
 
 
 DEFAULT_AGENTSMD_OUTPUT = "AGENTS.md"
@@ -330,10 +330,10 @@ class Yax:
     def _download_remote_source(self, url: str) -> str:
         """Retrieve remote source content with GitHub authentication support."""
 
-        ghurl = GitHubUrl.parse(url)
-        url = ghurl.raw()
+        ghfile = GitHubFile.parse(url)
+        url = ghfile.raw()
 
-        parsed = urlparse(ghurl.raw())
+        parsed = urlparse(ghfile.raw())
         return self._download_github_raw_with_fallback(parsed, url)
 
 
