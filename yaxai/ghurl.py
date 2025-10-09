@@ -1,10 +1,40 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import subprocess
+from typing import Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
+import os
 
+
+class GitHubTokenFinder:
+
+    def find(self) -> Optional[str]:
+        env_token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        if env_token:
+            env_token = env_token.strip()
+            if env_token:
+                return env_token
+
+        try:
+            result = subprocess.run(
+                ["gh", "auth", "token"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            token = result.stdout.strip()
+            if not token:
+                return None
+            return token
+        except FileNotFoundError:
+            return None
+        except subprocess.CalledProcessError:
+            return None
+    
 
 _ALLOWED_SCHEMES = {"http", "https"}
 _VALID_HOSTS = {"github.com", "raw.githubusercontent.com"}

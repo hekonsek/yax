@@ -1,10 +1,85 @@
+import subprocess
+from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
 import pytest
 
-from yaxai.ghurl import GitHubFile
+from yaxai.ghurl import GitHubFile, GitHubTokenFinder
+
+
+def test_find_returns_stripped_github_token_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "  abc123  ")
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.setattr("yaxai.ghurl.subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("gh cli should not run")))
+
+    finder = GitHubTokenFinder()
+
+    assert finder.find() == "abc123"
+
+
+def test_find_returns_stripped_gh_token_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setenv("GH_TOKEN", "\tdef456\n")
+    monkeypatch.setattr("yaxai.ghurl.subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("gh cli should not run")))
+
+    finder = GitHubTokenFinder()
+
+    assert finder.find() == "def456"
+
+
+def test_find_uses_cli_when_env_blank(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "   ")
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+
+    def fake_run(args, **kwargs):
+        assert args == ["gh", "auth", "token"]
+        return SimpleNamespace(stdout="cli-token\n")
+
+    monkeypatch.setattr("yaxai.ghurl.subprocess.run", fake_run)
+
+    finder = GitHubTokenFinder()
+
+    assert finder.find() == "cli-token"
+
+
+def test_find_returns_none_when_cli_returns_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.setattr("yaxai.ghurl.subprocess.run", lambda args, **kwargs: SimpleNamespace(stdout="   "))
+
+    finder = GitHubTokenFinder()
+
+    assert finder.find() is None
+
+
+def test_find_returns_none_when_cli_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+
+    def fake_run(*args, **kwargs):
+        raise FileNotFoundError("gh not installed")
+
+    monkeypatch.setattr("yaxai.ghurl.subprocess.run", fake_run)
+
+    finder = GitHubTokenFinder()
+
+    assert finder.find() is None
+
+
+def test_find_returns_none_when_cli_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+
+    def fake_run(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, ["gh", "auth", "token"])
+
+    monkeypatch.setattr("yaxai.ghurl.subprocess.run", fake_run)
+
+    finder = GitHubTokenFinder()
+
+    assert finder.find() is None
 
 
 def test_parse_accepts_github_ui_url() -> None:
