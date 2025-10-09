@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 
 _ALLOWED_SCHEMES = {"http", "https"}
@@ -38,8 +38,23 @@ class GitHubUrl:
         if normalized_host == "github.com":
             if len(segments) < 2:
                 raise ValueError("GitHub URL must include repository owner and name")
+            ui_segments = segments
         else:  # raw.githubusercontent.com
             if len(segments) < 4:
                 raise ValueError("GitHub raw URL must include owner, repository, ref, and file path")
+            owner, repository, ref, *file_segments = segments
+            ui_segments = [owner, repository, "blob", ref, *file_segments]
 
-        return cls(candidate)
+        ui_path = "/" + "/".join(ui_segments)
+        normalized_url = urlunparse(
+            (
+                "https",
+                "github.com",
+                ui_path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
+
+        return cls(normalized_url)

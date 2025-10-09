@@ -17,15 +17,23 @@ def test_parse_accepts_www_prefixed_host() -> None:
     instance = GitHubUrl.parse("https://www.github.com/acme/widgets/blob/main/README.md")
 
     parsed = urlparse(instance.url)
-    assert parsed.netloc == "www.github.com"
+    assert parsed.netloc == "github.com"
 
 
 def test_parse_accepts_github_raw_url() -> None:
     instance = GitHubUrl.parse("https://raw.githubusercontent.com/acme/widgets/main/docs/AGENTS.md")
 
     parsed = urlparse(instance.url)
-    assert parsed.netloc == "raw.githubusercontent.com"
-    assert parsed.path.endswith("docs/AGENTS.md")
+    assert parsed.netloc == "github.com"
+    assert parsed.path == "/acme/widgets/blob/main/docs/AGENTS.md"
+    assert instance.url == "https://github.com/acme/widgets/blob/main/docs/AGENTS.md"
+
+
+def test_parse_normalizes_http_to_https() -> None:
+    instance = GitHubUrl.parse("http://github.com/acme/widgets/blob/main/README.md")
+
+    assert instance.url.startswith("https://")
+    assert instance.url == "https://github.com/acme/widgets/blob/main/README.md"
 
 
 def test_parse_rejects_non_github_hosts() -> None:
