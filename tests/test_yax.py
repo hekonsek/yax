@@ -8,6 +8,7 @@ from yaxai.yax import (
     AgentsmdBuildConfig,
     CatalogBuildConfig,
     CatalogSource,
+    CatalogCollection,
     DEFAULT_AGENTSMD_OUTPUT,
     DEFAULT_CATALOG_OUTPUT,
     Discovery,
@@ -19,6 +20,30 @@ def _write_config(tmp_path: Path, contents: str) -> Path:
     config_path = tmp_path / "config.yml"
     config_path.write_text(dedent(contents), encoding="utf-8")
     return config_path
+
+
+def test_catalog_collection_output_url_replaces_filename():
+    collection = CatalogCollection(
+        url="https://example.com/path/to/yax.yml",
+        output="AGENTS.md",
+    )
+
+    assert collection.output_url() == "https://example.com/path/to/AGENTS.md"
+
+
+def test_catalog_collection_output_url_preserves_query_and_fragment():
+    collection = CatalogCollection(
+        url="https://example.com/path/yax-export.yml?raw=1#section",
+        output="docs/catalog.md",
+    )
+
+    assert collection.output_url() == "https://example.com/path/catalog.md?raw=1#section"
+
+
+def test_catalog_collection_output_url_defaults_to_agents_md():
+    collection = CatalogCollection(url="https://example.com/path/yax.yml")
+
+    assert collection.output_url() == "https://example.com/path/_agents.md"
 
 
 def test_open_catalog_build_config_defaults(tmp_path):

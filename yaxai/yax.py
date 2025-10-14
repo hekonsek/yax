@@ -257,6 +257,25 @@ class CatalogCollection:
 
         return cls(url=url_value.strip(), name=name_value, output=output_value)
 
+    def output_url(self) -> str:
+        """Return URL pointing to the collection output artifact."""
+
+        output_filename = Path(self.output or "_agents.md").name
+        if not output_filename:
+            raise ValueError("Catalog collection 'output' must include a file name")
+
+        parsed = urlparse(self.url)
+        path = parsed.path or ""
+
+        if not path or path.endswith("/"):
+            raise ValueError("Catalog collection 'url' must reference a file path")
+
+        path_segments = path.split("/")
+        path_segments[-1] = quote(output_filename)
+        new_path = "/".join(path_segments)
+
+        return parsed._replace(path=new_path).geturl()
+
     def to_dict(self) -> Dict[str, Any]:
         data: Dict[str, Any] = {"url": self.url}
         if self.name:
