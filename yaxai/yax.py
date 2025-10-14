@@ -21,9 +21,83 @@ DEFAULT_AGENTSMD_CONFIG_FILENAME = "yax.yml"
 
 @dataclass
 class AgentsmdBuildConfig:
-    urls: Optional[List[str]] = None
+    urls: List[str] = field(default_factory=list)
     output: str = DEFAULT_AGENTSMD_OUTPUT
     name: Optional[str] = None
+
+    @staticmethod
+    def _from_mapping(
+        data: Dict[str, Any],
+        *,
+        require_urls: bool,
+    ) -> "AgentsmdBuildConfig":
+        if not isinstance(data, dict):
+            raise ValueError("Configuration data must be a mapping")
+
+        build_section = data.get("build")
+        if build_section is None:
+            if require_urls:
+                raise ValueError("Agentsmd build config must specify a 'build' section")
+            return AgentsmdBuildConfig()
+
+        if not isinstance(build_section, dict):
+            raise ValueError("Configuration 'build' section must be a mapping")
+
+        agentsmd_section = build_section.get("agentsmd")
+        if agentsmd_section is None:
+            if require_urls:
+                raise ValueError("Agentsmd build config must specify a 'build.agentsmd' section")
+            return AgentsmdBuildConfig()
+
+        if not isinstance(agentsmd_section, dict):
+            raise ValueError("Configuration 'build.agentsmd' section must be a mapping")
+
+        urls_raw = agentsmd_section.get("from")
+        normalized_urls: List[str] = []
+        if urls_raw is None:
+            if require_urls:
+                raise ValueError("Agentsmd build config must specify at least one source URL in 'build.agentsmd.from'")
+        else:
+            if not isinstance(urls_raw, list):
+                raise ValueError("Expected 'from' to be a list of strings in config file")
+
+            for url in urls_raw:
+                if not isinstance(url, str):
+                    raise ValueError("Expected every entry in 'from' to be a string")
+                stripped_url = url.strip()
+                if stripped_url:
+                    normalized_urls.append(stripped_url)
+                elif require_urls:
+                    raise ValueError("Source URLs in 'build.agentsmd.from' must be non-empty strings")
+
+        if require_urls and not normalized_urls:
+            raise ValueError("Agentsmd build config must specify at least one source URL in 'build.agentsmd.from'")
+
+        output = agentsmd_section.get("output", DEFAULT_AGENTSMD_OUTPUT)
+        if output is None:
+            output = DEFAULT_AGENTSMD_OUTPUT
+        if not isinstance(output, str):
+            raise ValueError("Expected 'output' to be a string in config file")
+        stripped_output = output.strip()
+        if not stripped_output:
+            raise ValueError("'output' must be a non-empty string in config file")
+
+        name_value: Optional[str] = None
+        metadata_raw = agentsmd_section.get("metadata")
+        if metadata_raw is not None:
+            if not isinstance(metadata_raw, dict):
+                raise ValueError("Expected 'metadata' to be a mapping in config file")
+
+            raw_name = metadata_raw.get("name")
+            if raw_name is not None:
+                if not isinstance(raw_name, str):
+                    raise ValueError("Expected 'metadata.name' to be a string")
+                stripped_name = raw_name.strip()
+                if not stripped_name:
+                    raise ValueError("'metadata.name' must be a non-empty string when provided")
+                name_value = stripped_name
+
+        return AgentsmdBuildConfig(urls=normalized_urls, output=stripped_output, name=name_value)
 
     @staticmethod
     def resolve_config_path(
@@ -57,48 +131,104 @@ class AgentsmdBuildConfig:
         with open(config_file_path, "r", encoding="utf-8") as config_file:
             data = yaml.safe_load(config_file) or {}
 
-        agentsmd_section = data.get("build", {}).get("agentsmd", {})
+        return cls._from_mapping(data, require_urls=True)
 
-        urls = agentsmd_section.get("from")
+    @classmethod
+    def load_from_file(cls, config_path: Path) -> AgentsmdBuildConfig:
+        """Load configuration from a YAML file. Missing files yield an empty config."""
 
-        output = agentsmd_section.get("output", DEFAULT_AGENTSMD_OUTPUT)
-        if output is None:
-            output = DEFAULT_AGENTSMD_OUTPUT
-        if not isinstance(output, str):
-            raise ValueError("Expected 'output' to be a string in config file")
+        config_path = Path(config_path)
+        if not config_path.exists():
+            return cls()
 
-        if urls is None or len(urls) == 0:
-            raise ValueError("Agentsmd build config must specify at least one source URL in 'build.agentsmd.from'")
+        try:
+            contents = config_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RuntimeError(f"Failed to read configuration '{config_path}': {exc}") from exc
 
-        if not isinstance(urls, list):
-            raise ValueError("Expected 'from' to be a list of strings in config file")
+        try:
+            data = yaml.safe_load(contents) or {}
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Invalid YAML in '{config_path}': {exc}") from exc
 
-        normalized_urls: List[str] = []
-        for url in urls:
-            if not isinstance(url, str):
-                raise ValueError("Expected every entry in 'from' to be a string")
-            stripped_url = url.strip()
-            if stripped_url:
-                normalized_urls.append(stripped_url)
+        return cls._from_mapping(data, require_urls=False)
+
+    def has_url(self, url: str) -> bool:
+        """Return True if the configuration already contains the provided URL."""
+
+        normalized = url.strip()
+        return any(existing == normalized for existing in self.urls)
+
+    def add_url(self, url: str) -> bool:
+        """Add a URL to the configuration if it is not already present."""
+
+        normalized = url.strip()
+        if not normalized:
+            raise ValueError("URL must be a non-empty string")
+
+        if self.has_url(normalized):
+            return False
+
+        self.urls.append(normalized)
+        return True
+
+    def save(self, config_path: Path) -> None:
+        """Persist the configuration to disk, preserving unrelated sections."""
+
+        config_path = Path(config_path)
+
+        if config_path.exists():
+            try:
+                raw_text = config_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise RuntimeError(f"Failed to read configuration '{config_path}': {exc}") from exc
+
+            try:
+                data = yaml.safe_load(raw_text) or {}
+            except yaml.YAMLError as exc:
+                raise ValueError(f"Invalid YAML in '{config_path}': {exc}") from exc
+
+            if not isinstance(data, dict):
+                raise ValueError(f"Configuration '{config_path}' must contain a mapping at the root")
+        else:
+            data = {}
+
+        build_section = data.setdefault("build", {})
+        if not isinstance(build_section, dict):
+            raise ValueError(f"Configuration '{config_path}' must define 'build' as a mapping")
+
+        agentsmd_section = build_section.setdefault("agentsmd", {})
+        if not isinstance(agentsmd_section, dict):
+            raise ValueError(f"Configuration '{config_path}' must define 'build.agentsmd' as a mapping")
+
+        agentsmd_section["from"] = list(self.urls)
+
+        stripped_output = (self.output or "").strip()
+        if not stripped_output:
+            agentsmd_section.pop("output", None)
+        else:
+            agentsmd_section["output"] = stripped_output
+
+        if self.name is not None:
+            metadata = agentsmd_section.setdefault("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+                agentsmd_section["metadata"] = metadata
+            metadata["name"] = self.name
+        else:
+            metadata = agentsmd_section.get("metadata")
+            if isinstance(metadata, dict):
+                metadata.pop("name", None)
+                if not metadata:
+                    agentsmd_section.pop("metadata", None)
             else:
-                raise ValueError("Source URLs in 'build.agentsmd.from' must be non-empty strings")
+                agentsmd_section.pop("metadata", None)
 
-        name_value: Optional[str] = None
-        metadata_raw = agentsmd_section.get("metadata")
-        if metadata_raw is not None:
-            if not isinstance(metadata_raw, dict):
-                raise ValueError("Expected 'metadata' to be a mapping in config file")
-
-            raw_name = metadata_raw.get("name")
-            if raw_name is not None:
-                if not isinstance(raw_name, str):
-                    raise ValueError("Expected 'metadata.name' to be a string")
-                stripped_name = raw_name.strip()
-                if not stripped_name:
-                    raise ValueError("'metadata.name' must be a non-empty string when provided")
-                name_value = stripped_name
-
-        return cls(urls=normalized_urls, output=output, name=name_value)
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            yaml.safe_dump(data, sort_keys=False),
+            encoding="utf-8",
+        )
 
 
 DEFAULT_CATALOG_OUTPUT = "yax-catalog.json"

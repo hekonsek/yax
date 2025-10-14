@@ -33,6 +33,36 @@ app.add_typer(agentsmd_app, name="agentsmd")
 catalog_app = typer.Typer(help="Build catalog artifacts.", no_args_is_help=True)
 app.add_typer(catalog_app, name="catalog")
 
+
+def _format_collection_label(collection: CatalogCollection) -> str:
+    """Return the display label for a collection."""
+
+    if collection.name and collection.name.strip():
+        return collection.name.strip()
+
+    try:
+        url = collection.output_url().strip()
+        if url:
+            return url
+    except Exception:  # pragma: no cover - defensive fallback
+        pass
+
+    return collection.url.strip()
+
+
+def _collection_target_url(collection: CatalogCollection) -> str:
+    """Return URL that should be added to the agentsmd sources list."""
+
+    try:
+        url = collection.output_url().strip()
+    except Exception:  # pragma: no cover - defensive fallback
+        url = collection.url.strip()
+
+    if not url:
+        raise ValueError("Collection URL is empty and cannot be added to the configuration")
+
+    return url
+
 def _load_agentsmd_config(config_path: Path) -> AgentsmdBuildConfig:
     """Load and return the agentsmd build configuration from the provided path."""
 
@@ -181,18 +211,58 @@ def agentsmd_discover(
         typer.echo("No catalog collections found.")
         return
 
-    for collection in collections:
-        output_url = collection.output_url().strip()
-        name = collection.name.strip() if collection.name else None
+    config_path = Path(DEFAULT_CONFIG_FILENAME)
+    try:
+        build_config = AgentsmdBuildConfig.load_from_file(config_path)
+    except Exception as exc:
+        typer.echo(f"Failed to load configuration: {exc}")
+        raise typer.Exit(code=1)
 
-        if name and output_url:
-            typer.echo(f"{name}: {output_url}")
-        elif output_url:
-            typer.echo(output_url)
-        elif name:
-            typer.echo(name)
+    while True:
+        typer.echo("Available collections:")
+        for index, collection in enumerate(collections, start=1):
+            label = _format_collection_label(collection)
+            typer.echo(f"{index}. {label}")
+
+        selection = typer.prompt(
+            "Select a collection number (press Enter to exit)",
+            default="",
+            show_default=False,
+        ).strip()
+
+        if not selection:
+            return
+
+        try:
+            index = int(selection)
+        except ValueError:
+            typer.echo("Invalid selection. Enter a number from the list or press Enter to exit.")
+            continue
+
+        if not 1 <= index <= len(collections):
+            typer.echo("Invalid selection. Enter a number from the list or press Enter to exit.")
+            continue
+
+        chosen = collections[index - 1]
+
+        try:
+            target_url = _collection_target_url(chosen)
+        except ValueError as exc:
+            typer.echo(f"Unable to add selection: {exc}")
+            continue
+
+        try:
+            added = build_config.add_url(target_url)
+            if added:
+                build_config.save(config_path)
+        except Exception as exc:
+            typer.echo(f"Failed to update configuration: {exc}")
+            raise typer.Exit(code=1)
+
+        if added:
+            typer.echo(f"Added {target_url} to {config_path}.")
         else:
-            typer.echo("(missing name and url)")
+            typer.echo(f"{target_url} is already present in {config_path}.")
 
 @catalog_app.command("build")
 def catalog_build(

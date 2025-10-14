@@ -4,6 +4,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from yaxai.cli import DEFAULT_CATALOG_CONFIG_FILENAME, DEFAULT_CONFIG_FILENAME, app
@@ -271,7 +272,7 @@ def test_catalog_export_reports_unsupported_format():
         assert "Unsupported export format" in result.stdout
 
 
-def test_agentsmd_discover_lists_collections():
+def test_agentsmd_discover_adds_selected_collection():
     catalog_data = {
         "organizations": [
             {
@@ -291,12 +292,59 @@ def test_agentsmd_discover_lists_collections():
         result = runner.invoke(
             app,
             ["agentsmd", "discover", "--catalog", str(catalog_path)],
+            input="1\n\n",
         )
 
         assert result.exit_code == 0
-        lines = result.stdout.splitlines()
-        assert "Example One: https://example.com/_agents.md" in lines
-        assert "https://example.com/_agents.md" in lines
+        config_path = Path(DEFAULT_CONFIG_FILENAME)
+        assert config_path.exists()
+
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        assert config["build"]["agentsmd"]["from"] == ["https://example.com/_agents.md"]
+
+        assert "1. Example One" in result.stdout
+        assert "Added https://example.com/_agents.md to yax.yml." in result.stdout
+
+
+def test_agentsmd_discover_informs_when_url_already_present():
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example Org",
+                "collections": [
+                    {"url": "https://example.com/one.yml", "name": "Example One"},
+                ],
+            }
+        ]
+    }
+
+    with runner.isolated_filesystem():
+        Path(DEFAULT_CONFIG_FILENAME).write_text(
+            dedent(
+                """
+                build:
+                  agentsmd:
+                    from:
+                      - https://example.com/_agents.md
+                """
+            ),
+            encoding="utf-8",
+        )
+        catalog_path = Path("catalog.json")
+        catalog_path.write_text(json.dumps(catalog_data), encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["agentsmd", "discover", "--catalog", str(catalog_path)],
+            input="1\n\n",
+        )
+
+        assert result.exit_code == 0
+        output_lines = result.stdout.splitlines()
+        assert any("already present" in line for line in output_lines)
+
+        config = yaml.safe_load(Path(DEFAULT_CONFIG_FILENAME).read_text(encoding="utf-8"))
+        assert config["build"]["agentsmd"]["from"] == ["https://example.com/_agents.md"]
 
 
 def test_agentsmd_discover_reports_missing_catalog():
