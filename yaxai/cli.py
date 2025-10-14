@@ -219,7 +219,6 @@ def agentsmd_discover(
         raise typer.Exit(code=1)
 
     while True:
-        typer.echo("Available collections:")
         for index, collection in enumerate(collections, start=1):
             label = _format_collection_label(collection)
             typer.echo(f"{index}. {label}")
