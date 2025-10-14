@@ -294,8 +294,9 @@ def test_agentsmd_discover_lists_collections():
         )
 
         assert result.exit_code == 0
-        assert "Example One: https://example.com/one.yml" in result.stdout
-        assert "https://example.com/two.yml" in result.stdout
+        lines = result.stdout.splitlines()
+        assert "Example One: https://example.com/_agents.md" in lines
+        assert "https://example.com/_agents.md" in lines
 
 
 def test_agentsmd_discover_reports_missing_catalog():

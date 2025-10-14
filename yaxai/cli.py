@@ -182,13 +182,13 @@ def agentsmd_discover(
         return
 
     for collection in collections:
-        url = collection.url.strip()
+        output_url = collection.output_url().strip()
         name = collection.name.strip() if collection.name else None
 
-        if name and url:
-            typer.echo(f"{name}: {url}")
-        elif url:
-            typer.echo(url)
+        if name and output_url:
+            typer.echo(f"{name}: {output_url}")
+        elif output_url:
+            typer.echo(output_url)
         elif name:
             typer.echo(name)
         else:
