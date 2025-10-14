@@ -8,6 +8,7 @@ from yaxai.yax import (
     AgentsmdBuildConfig,
     CatalogBuildConfig,
     CatalogSource,
+    DEFAULT_AGENTSMD_OUTPUT,
     DEFAULT_CATALOG_OUTPUT,
     Discovery,
     Yax,
@@ -191,6 +192,45 @@ def test_build_catalog_includes_metadata(tmp_path):
     expected_collection = {
         "url": "file:" + str(source_path),
         "name": "Example Catalog",
+        "output": DEFAULT_AGENTSMD_OUTPUT,
+    }
+
+    assert result == {
+        "organizations": [
+            {
+                "collections": [expected_collection],
+                "name": "example",
+            }
+        ]
+    }
+
+
+def test_build_catalog_reads_output_from_source(tmp_path):
+    output_path = tmp_path / "dir" / "catalog.json"
+    source_path = tmp_path / "source.yml"
+    source_path.write_text(
+        dedent(
+            """
+            build:
+              agentsmd:
+                output: docs/catalog.md
+            """
+        ),
+        encoding="utf-8",
+    )
+    config = CatalogBuildConfig(
+        organization="example",
+        sources=[CatalogSource(url="file:" + str(source_path))],
+        output=str(output_path),
+    )
+
+    Yax().build_catalog(config)
+
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+
+    expected_collection = {
+        "url": "file:" + str(source_path),
+        "output": "docs/catalog.md",
     }
 
     assert result == {

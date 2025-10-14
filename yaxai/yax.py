@@ -5,7 +5,7 @@ import subprocess
 from dataclasses import dataclass, field
 from glob import glob
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.parse import ParseResult, quote, unquote, urlparse
 from urllib.request import Request, urlopen
@@ -194,6 +194,7 @@ class CatalogBuildConfig:
 class CatalogCollection:
     url: str
     name: Optional[str] = None
+    output: Optional[str] = None
 
     def __post_init__(self) -> None:
         self.url = self.url.strip()
@@ -201,6 +202,10 @@ class CatalogCollection:
             self.name = self.name.strip()
             if not self.name:
                 raise ValueError("Catalog collection name must be a non-empty string when provided")
+        if self.output is not None:
+            self.output = self.output.strip()
+            if not self.output:
+                raise ValueError("Catalog collection output must be a non-empty string when provided")
 
     @classmethod
     def from_mapping(cls, data: Any) -> "CatalogCollection":
@@ -239,12 +244,25 @@ class CatalogCollection:
                         )
                     name_value = stripped_meta_name
 
-        return cls(url=url_value.strip(), name=name_value)
+        output_value: Optional[str] = None
+        if "output" in data:
+            direct_output = data.get("output")
+            if direct_output is not None:
+                if not isinstance(direct_output, str):
+                    raise ValueError("Expected collection 'output' to be a string")
+                stripped_output = direct_output.strip()
+                if not stripped_output:
+                    raise ValueError("Collection 'output' must be a non-empty string when provided")
+                output_value = stripped_output
+
+        return cls(url=url_value.strip(), name=name_value, output=output_value)
 
     def to_dict(self) -> Dict[str, Any]:
         data: Dict[str, Any] = {"url": self.url}
         if self.name:
             data["name"] = self.name
+        if self.output is not None:
+            data["output"] = self.output
         return data
 
 
@@ -362,17 +380,22 @@ class Yax:
     def build_catalog(self, config: CatalogBuildConfig) -> None:
         """Construct a catalog JSON document based on the provided configuration."""
 
+        collections: List[CatalogCollection] = []
+        for source in config.sources:
+            collection_name, collection_output = self._discover_catalog_collection_details(source.url)
+            collections.append(
+                CatalogCollection(
+                    url=source.url,
+                    name=collection_name,
+                    output=collection_output,
+                )
+            )
+
         catalog = Catalog(
             organizations=[
                 CatalogOrganization(
                     name=config.organization,
-                    collections=[
-                        CatalogCollection(
-                            url=source.url,
-                            name=self._discover_catalog_collection_name(source.url),
-                        )
-                        for source in config.sources
-                    ],
+                    collections=collections,
                 )
             ]
         )
@@ -411,39 +434,55 @@ class Yax:
 
         return output_path
 
-    def _discover_catalog_collection_name(self, source_url: str) -> Optional[str]:
-        """Load the referenced Yax config and extract the collection display name."""
+    def _discover_catalog_collection_details(self, source_url: str) -> Tuple[Optional[str], Optional[str]]:
+        """Load the referenced Yax config and extract collection metadata."""
 
         config_text = self._read_catalog_source_text(source_url)
         config_data = self._parse_catalog_source_yaml(config_text, source_url)
 
         build_section = config_data.get("build")
         if not isinstance(build_section, dict):
-            return None
+            return (None, None)
 
         agentsmd_section = build_section.get("agentsmd")
         if not isinstance(agentsmd_section, dict):
-            return None
+            return (None, None)
 
+        name_value: Optional[str] = None
         metadata = agentsmd_section.get("metadata")
-        if not isinstance(metadata, dict):
-            return None
+        if isinstance(metadata, dict):
+            raw_name = metadata.get("name")
+            if raw_name is not None:
+                if not isinstance(raw_name, str):
+                    raise ValueError(
+                        f"Catalog source '{source_url}' metadata 'name' must be a string"
+                    )
 
-        raw_name = metadata.get("name")
-        if raw_name is None:
-            return None
-        if not isinstance(raw_name, str):
-            raise ValueError(
-                f"Catalog source '{source_url}' metadata 'name' must be a string"
-            )
+                stripped_name = raw_name.strip()
+                if not stripped_name:
+                    raise ValueError(
+                        f"Catalog source '{source_url}' metadata 'name' must be a non-empty string"
+                    )
+                name_value = stripped_name
 
-        stripped = raw_name.strip()
-        if not stripped:
-            raise ValueError(
-                f"Catalog source '{source_url}' metadata 'name' must be a non-empty string"
-            )
+        output_value: Optional[str] = None
+        raw_output = agentsmd_section.get("output", DEFAULT_AGENTSMD_OUTPUT)
+        if raw_output is None:
+            raw_output = DEFAULT_AGENTSMD_OUTPUT
 
-        return stripped
+        if raw_output is not None:
+            if not isinstance(raw_output, str):
+                raise ValueError(
+                    f"Catalog source '{source_url}' 'output' must be a string"
+                )
+            stripped_output = raw_output.strip()
+            if not stripped_output:
+                raise ValueError(
+                    f"Catalog source '{source_url}' 'output' must be a non-empty string when provided"
+                )
+            output_value = stripped_output
+
+        return (name_value, output_value)
 
     def _parse_catalog_source_yaml(self, contents: str, source_url: str) -> Dict[str, Any]:
         """Parse YAML contents from a catalog source and validate the structure."""
