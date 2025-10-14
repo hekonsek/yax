@@ -269,3 +269,64 @@ def test_catalog_export_reports_unsupported_format():
 
         assert result.exit_code == 1
         assert "Unsupported export format" in result.stdout
+
+
+def test_agentsmd_discover_lists_collections():
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example Org",
+                "collections": [
+                    {"url": "https://example.com/one.yml", "name": "Example One"},
+                    {"url": "https://example.com/two.yml"},
+                ],
+            }
+        ]
+    }
+
+    with runner.isolated_filesystem():
+        catalog_path = Path("catalog.json")
+        catalog_path.write_text(json.dumps(catalog_data), encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["agentsmd", "discover", "--catalog", str(catalog_path)],
+        )
+
+        assert result.exit_code == 0
+        assert "Example One: https://example.com/one.yml" in result.stdout
+        assert "https://example.com/two.yml" in result.stdout
+
+
+def test_agentsmd_discover_reports_missing_catalog():
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            app,
+            ["agentsmd", "discover", "--catalog", "missing.json"],
+        )
+
+        assert result.exit_code == 1
+        assert "Catalog file not found" in result.stdout
+
+
+def test_agentsmd_discover_reports_no_collections():
+    catalog_data = {
+        "organizations": [
+            {
+                "name": "Example Org",
+                "collections": [],
+            }
+        ]
+    }
+
+    with runner.isolated_filesystem():
+        catalog_path = Path("catalog.json")
+        catalog_path.write_text(json.dumps(catalog_data), encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["agentsmd", "discover", "--catalog", str(catalog_path)],
+        )
+
+        assert result.exit_code == 0
+        assert "No catalog collections found." in result.stdout

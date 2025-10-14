@@ -13,6 +13,7 @@ from .yax import (
     DEFAULT_CATALOG_OUTPUT,
     AgentsmdBuildConfig,
     CatalogBuildConfig,
+    Discovery,
     Yax,
 )
 
@@ -154,6 +155,44 @@ def build_alias(
     """Shorter alias for `yax agentsmd build`."""
 
     _build_agentsmd(config, output)
+
+
+@agentsmd_app.command("discover")
+def agentsmd_discover(
+    catalog: Optional[Path] = typer.Option(
+        None,
+        "--catalog",
+        "-c",
+        resolve_path=True,
+        help="Path to the catalog JSON file. Defaults to ~/.yax/yax-catalog.json.",
+    ),
+) -> None:
+    """List collections discovered from the catalog JSON."""
+
+    discovery = Discovery(catalog)
+
+    try:
+        collections = discovery.discover()
+    except Exception as exc:
+        typer.echo(f"Error discovering catalogs: {exc}")
+        raise typer.Exit(code=1)
+
+    if not collections:
+        typer.echo("No catalog collections found.")
+        return
+
+    for collection in collections:
+        url = collection.url.strip()
+        name = collection.name.strip() if collection.name else None
+
+        if name and url:
+            typer.echo(f"{name}: {url}")
+        elif url:
+            typer.echo(url)
+        elif name:
+            typer.echo(name)
+        else:
+            typer.echo("(missing name and url)")
 
 @catalog_app.command("build")
 def catalog_build(

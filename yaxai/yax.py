@@ -300,6 +300,36 @@ class Catalog:
         }
 
 
+class Discovery:
+    """Load catalog information and expose its collections."""
+
+    DEFAULT_CATALOG_PATH = Path.home() / ".yax" / DEFAULT_CATALOG_OUTPUT
+
+    def __init__(self, catalog_path: Optional[Path | str] = None) -> None:
+        if catalog_path is None:
+            self._catalog_path = self.DEFAULT_CATALOG_PATH
+        else:
+            self._catalog_path = Path(catalog_path)
+
+    def discover(self) -> List[CatalogCollection]:
+        catalog_path = self._catalog_path
+        if not catalog_path.exists():
+            raise FileNotFoundError(f"Catalog file not found: {catalog_path}")
+
+        try:
+            catalog_data = json.loads(catalog_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid catalog JSON in '{catalog_path}': {exc}") from exc
+
+        catalog = Catalog.from_mapping(catalog_data)
+
+        collections: List[CatalogCollection] = []
+        for organization in catalog.organizations:
+            collections.extend(organization.collections)
+
+        return collections
+
+
 class Yax:
     """Core Yax entry point placeholder."""
 

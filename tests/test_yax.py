@@ -9,6 +9,7 @@ from yaxai.yax import (
     CatalogBuildConfig,
     CatalogSource,
     DEFAULT_CATALOG_OUTPUT,
+    Discovery,
     Yax,
 )
 
@@ -307,3 +308,48 @@ def test_export_catalog_rejects_unknown_format(tmp_path):
 
     with pytest.raises(ValueError):
         Yax().export_catalog(source, "unsupported")
+
+
+def test_discovery_returns_collections(tmp_path):
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "organizations": [
+                    {
+                        "name": "Example Org",
+                        "collections": [
+                            {"url": "https://example.com/one.yml", "name": "Example One"},
+                            {"url": "https://example.com/two.yml"},
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    collections = Discovery(catalog_path).discover()
+
+    assert len(collections) == 2
+    assert collections[0].url == "https://example.com/one.yml"
+    assert collections[0].name == "Example One"
+    assert collections[1].url == "https://example.com/two.yml"
+    assert collections[1].name is None
+
+
+def test_discovery_missing_file(tmp_path):
+    discovery = Discovery(tmp_path / "missing.json")
+
+    with pytest.raises(FileNotFoundError):
+        discovery.discover()
+
+
+def test_discovery_invalid_json(tmp_path):
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text("not json", encoding="utf-8")
+
+    discovery = Discovery(catalog_path)
+
+    with pytest.raises(ValueError):
+        discovery.discover()
