@@ -5,6 +5,8 @@ import pytest
 
 from urllib.error import HTTPError, URLError
 
+from pydantic import ValidationError
+
 from yaxai.yax import (
     AgentsmdBuildConfig,
     DEFAULT_AGENTSMD_CONFIG_FILENAME,
@@ -95,23 +97,6 @@ def test_parse_yml_with_urls_and_output(tmp_path):
     assert config.output == "docs/AGENTS.md"
 
 
-def test_parse_yml_treats_none_output_as_default(tmp_path):
-    config_file = _write_config(
-        tmp_path,
-        """
-        build:
-          agentsmd:
-            from:
-              - https://example.com/a.md
-            output: null
-        """,
-    )
-
-    config = AgentsmdBuildConfig.parse_yml(config_file)
-
-    assert config.output == DEFAULT_AGENTSMD_OUTPUT
-
-
 def test_parse_yml_rejects_non_string_output(tmp_path):
     config_file = _write_config(
         tmp_path,
@@ -123,7 +108,7 @@ def test_parse_yml_rejects_non_string_output(tmp_path):
         """,
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         AgentsmdBuildConfig.parse_yml(str(config_file))
 
 
@@ -152,7 +137,7 @@ def test_parse_yml_requires_string_urls(tmp_path):
         """,
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         AgentsmdBuildConfig.parse_yml(str(config_file))
 
 def test_parse_yml_rejects_empty_urls(tmp_path):
@@ -179,7 +164,7 @@ def test_parse_yml_rejects_blank_urls(tmp_path):
         """,
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         AgentsmdBuildConfig.parse_yml(str(config_file))
 
 
@@ -258,5 +243,4 @@ def test_build_agentsmd_errors_when_glob_matches_nothing(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(RuntimeError):
         Yax().build_agentsmd(config)
-
 

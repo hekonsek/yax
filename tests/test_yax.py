@@ -356,7 +356,7 @@ def test_agentsmd_build_config_parses_metadata(tmp_path):
     config = AgentsmdBuildConfig.parse_yml(config_path)
 
     assert config.urls == ["https://example.com/agents.md"]
-    assert config.name == "Example Project"
+    assert config.metadata.get("name") == "Example Project"
 
 
 def test_export_catalog_rejects_invalid_json(tmp_path):

@@ -83,7 +83,7 @@ def _build_agentsmd(config: Path, output: Optional[Path]) -> None:
     build_config = _load_agentsmd_config(config)
 
     if output is not None:
-        build_config = replace(build_config, output=str(output))
+        build_config = build_config.model_copy(update={"output": str(output)})
 
     yax = Yax()
 
@@ -213,10 +213,9 @@ def agentsmd_discover(
 
     config_path = Path(DEFAULT_CONFIG_FILENAME)
     try:
-        build_config = AgentsmdBuildConfig.load_from_file(config_path)
-    except Exception as exc:
-        typer.echo(f"Failed to load configuration: {exc}")
-        raise typer.Exit(code=1)
+        build_config = AgentsmdBuildConfig.parse_yml(config_path)
+    except FileNotFoundError as exc:
+        build_config = AgentsmdBuildConfig()
 
     while True:
         for index, collection in enumerate(collections, start=1):
