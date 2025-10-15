@@ -70,24 +70,6 @@ class AgentsmdBuildConfig(BaseModel):
             data.get("build", {}).get("agentsmd", {})
         )
 
-    def has_url(self, url: str) -> bool:
-        """Return True if the configuration already contains the provided URL."""
-
-        normalized = url.strip()
-        return any(existing == normalized for existing in self.urls)
-
-    def add_url(self, url: str) -> bool:
-        """Add a URL to the configuration if it is not already present."""
-
-        normalized = url.strip()
-        if not normalized:
-            raise ValueError("URL must be a non-empty string")
-
-        if self.has_url(normalized):
-            return False
-
-        self.urls.append(normalized)
-        return True
 
     def save(self, config_path: Path) -> None:
         """Persist the configuration to disk, preserving unrelated sections."""

@@ -250,17 +250,15 @@ def agentsmd_discover(
             continue
 
         try:
-            added = build_config.add_url(target_url)
-            if added:
+            if target_url not in build_config.urls:
+                build_config.urls.append(target_url)
                 build_config.save(config_path)
+                typer.echo(f"Added {target_url} to {config_path}.")
+            else:
+                typer.echo(f"{target_url} is already present in {config_path}.")
         except Exception as exc:
             typer.echo(f"Failed to update configuration: {exc}")
             raise typer.Exit(code=1)
-
-        if added:
-            typer.echo(f"Added {target_url} to {config_path}.")
-        else:
-            typer.echo(f"{target_url} is already present in {config_path}.")
 
 @catalog_app.command("build")
 def catalog_build(
