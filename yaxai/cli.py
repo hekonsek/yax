@@ -122,7 +122,7 @@ def _build_catalog(config: Path, output: Optional[Path]) -> None:
         typer.echo(f"Error building catalog: {exc}")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Generated catalog at {_green(build_config.output)}.")
+    typer.echo(f"Generated catalog at: {_green(build_config.output)}")
 
 
 def _export_catalog(source: Path, format_name: str) -> None:
@@ -140,7 +140,7 @@ def _export_catalog(source: Path, format_name: str) -> None:
         typer.echo(f"Error exporting catalog: {exc}")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Exported catalog to {_green(output_path)}.")
+    typer.echo(f"Exported catalog to: {_green(output_path)}")
 
 
 @agentsmd_app.command("build")
