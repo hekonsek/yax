@@ -96,35 +96,6 @@ def _build_agentsmd(config: Path, output: Optional[Path]) -> None:
     typer.echo(f"Generated agents markdown: {_green(build_config.output)}")
 
 
-def _load_catalog_config(config_path: Path) -> CatalogBuildConfig:
-    """Load and return the catalog build configuration from the provided path."""
-
-    if not config_path.exists():
-        typer.echo(f"Configuration file not found: {config_path}")
-        raise typer.Exit(code=1)
-
-    return CatalogBuildConfig.open_catalog_build_config(str(config_path))
-
-
-def _build_catalog(config: Path, output: Optional[Path]) -> None:
-    """Execute the catalog build workflow."""
-
-    build_config = _load_catalog_config(config)
-
-    if output is not None:
-        build_config = replace(build_config, output=str(output))
-
-    yax = Yax()
-
-    try:
-        yax.build_catalog(build_config)
-    except Exception as exc:  # pragma: no cover - relies on filesystem and IO errors
-        typer.echo(f"Error building catalog: {exc}")
-        raise typer.Exit(code=1)
-
-    typer.echo(f"Generated catalog at: {_green(build_config.output)}")
-
-
 def _export_catalog(source: Path, format_name: str) -> None:
     """Export catalog JSON into the requested format."""
 
@@ -267,7 +238,7 @@ def catalog_build(
         "--config",
         "-c",
         resolve_path=True,
-        help="Path to the YAML configuration file for catalog builds.",
+        help="Path to the catalog YAML configuration file.",
         show_default=True,
     ),
     output: Optional[Path] = typer.Option(
@@ -278,8 +249,17 @@ def catalog_build(
     ),
 ):
     """Build the catalog JSON artifact."""
+    try:
+        build_config = CatalogBuildConfig.open_catalog_build_config(config)
+        if output:
+            build_config = replace(build_config, output=str(output))
 
-    _build_catalog(config, output)
+        Yax().build_catalog(build_config)
+
+        typer.echo(f"Generated catalog at: {_green(build_config.output)}")
+    except FileNotFoundError:
+        typer.echo(f"Catalog configuration file not found: {config}")
+        raise typer.Exit(code=1)
 
 
 @catalog_app.command("export")

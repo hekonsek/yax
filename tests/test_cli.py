@@ -1,6 +1,7 @@
 import os
 import json
 from pathlib import Path
+import shlex
 from textwrap import dedent
 
 import pytest
@@ -151,11 +152,10 @@ def test_root_build_alias_runs_agentsmd_workflow():
 
 
 def test_catalog_build_missing_config():
-    with runner.isolated_filesystem():
-        result = runner.invoke(app, ["catalog", "build"])
+    result = runner.invoke(app, shlex.split("catalog build --config no_such_file.yml"))
 
     assert result.exit_code == 1
-    assert "Configuration file not found" in result.stdout
+    assert "Catalog configuration file not found" in result.stdout
 
 
 def test_catalog_build_creates_json():
