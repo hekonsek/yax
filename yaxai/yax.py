@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass, field
 from glob import glob
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.error import HTTPError, URLError
 from urllib.parse import ParseResult, quote, unquote, urlparse
-from urllib.request import Request, urlopen
 
 import yaml
 
