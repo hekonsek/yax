@@ -90,7 +90,13 @@ class AgentsmdBuildConfig(BaseModel):
             if not isinstance(data, dict):
                 raise ValueError(f"Configuration '{config_path}' must contain a mapping at the root")
         else:
-            data = {"build": {"agentsmd": self.model_dump(by_alias=True)}}
+            data = {}
+
+        if "build" in data and not isinstance(data["build"], dict):
+            raise ValueError(f"Configuration '{config_path}' must contain a mapping at 'build'")
+
+        build_section = data.setdefault("build", {})
+        build_section["agentsmd"] = self.model_dump(by_alias=True)
 
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(
